@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import StepProgress from "../../components/StepProgress";
+import StepProgress from "../components/StepProgress";
 
 /* Helpers */
 const dayStart = 7 * 60, dayEnd = 19 * 60, step = 30;

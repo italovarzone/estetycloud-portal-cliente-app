@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import StepProgress from "../../components/StepProgress";
+import StepProgress from "../components/StepProgress";
 
 function apiBase() {
   return (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");

@@ -1,9 +1,12 @@
 import SaveTenant from "./SaveTenant";
+import AuthGate from "./AuthGate";
 
 export const metadata = {
   title: "Portal do Cliente • Estety Cloud",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
+
+// (opcional, se quiser controlar viewport por layout)
+// export const viewport = { width: "device-width", initialScale: 1, maximumScale: 1 };
 
 export default function TenantLayout({
   children,
@@ -16,8 +19,8 @@ export default function TenantLayout({
     <>
       {/* salva/atualiza o tenantId assim que a página renderiza */}
       <SaveTenant tenantId={params.tenantId} />
-      {children}
+      {/* protege tudo do grupo (protected) */}
+      <AuthGate>{children}</AuthGate>
     </>
   );
 }
-
