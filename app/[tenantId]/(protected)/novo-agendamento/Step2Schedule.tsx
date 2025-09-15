@@ -5,8 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import StepProgress from "../components/StepProgress";
 
 /* ===== helpers ===== */
-const STEP_MIN = 30; // grade dos botões
+const STEP_MIN = 30;
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const DH_NAMES = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+
+type DayCfg = { enabled: boolean; start: string | null; end: string | null };
 
 function apiBase() {
   return (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
@@ -18,7 +21,7 @@ function parseYMD(ymd: string) {
   const [y, m, d] = String(ymd).split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
-function minutesFromHHMM(hhmm?: string) {
+function minutesFromHHMM(hhmm?: string | null) {
   const [h, m] = String(hhmm || "00:00").split(":").map((n) => Number(n || 0));
   return (h || 0) * 60 + (m || 0);
 }
@@ -30,7 +33,6 @@ function hhmmFromMinutes(total: number) {
 function overlaps(aS: number, aE: number, bS: number, bE: number) {
   return aS < bE && aE > bS;
 }
-// data helpers para "passado"
 function isPastDay(d: Date) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const day = new Date(d);  day.setHours(0, 0, 0, 0);
@@ -43,12 +45,14 @@ function nowMinutes() {
   const n = new Date();
   return n.getHours() * 60 + n.getMinutes();
 }
+function defaultWeek(): DayCfg[] {
+  return Array.from({ length: 7 }).map(() => ({ enabled: true, start: "07:00", end: "19:00" }));
+}
+
 
 /** normaliza (ordena + une sobreposições) */
 function normalize(segs: { s: number; e: number }[]) {
-  const a = segs
-    .filter((x) => x.e > x.s)
-    .sort((x, y) => x.s - y.s);
+  const a = segs.filter((x) => x.e > x.s).sort((x, y) => x.s - y.s);
   const out: { s: number; e: number }[] = [];
   for (const cur of a) {
     if (!out.length || cur.s > out[out.length - 1].e) out.push({ ...cur });
@@ -78,7 +82,6 @@ function subtract(base: { s: number; e: number }[], remove: { s: number; e: numb
       } else if (r.s > b.s && r.e >= b.e) {
         next.push({ s: b.s, e: r.s });
       } else {
-        // r no meio -> quebra em 2
         next.push({ s: b.s, e: r.s }, { s: r.e, e: b.e });
       }
     }
@@ -87,6 +90,7 @@ function subtract(base: { s: number; e: number }[], remove: { s: number; e: numb
   return cur;
 }
 
+/* ===== tipos ===== */
 type ProcPick = { _id: string; name: string; price: number; duration?: number };
 type ExceptionRaw = { type?: string; kind?: string; start?: string; end?: string; reason?: string };
 
@@ -109,13 +113,12 @@ export default function Step2Schedule({
   });
   const [selectedDate, setSelectedDate] = useState(() => toYMD(new Date()));
 
-  // dados carregados
+  // dados
   const [allProcedures, setAllProcedures] = useState<any[]>([]);
   const [dayAppointments, setDayAppointments] = useState<any[]>([]);
-  const [defaultHours, setDefaultHours] = useState<{ start: string; end: string }>({ start: "07:00", end: "19:00" });
+  const [defaultHoursByDay, setDefaultHoursByDay] = useState<DayCfg[] | null>(null);
+  const [dayBaseCfg, setDayBaseCfg] = useState<DayCfg>({ enabled: true, start: "07:00", end: "19:00" });
   const [exceptions, setExceptions] = useState<ExceptionRaw[]>([]);
-
-  // dias ausentes do mês (YYYY-MM-DD)
   const [dayOffSet, setDayOffSet] = useState<Set<string>>(new Set());
 
   // ui
@@ -125,6 +128,7 @@ export default function Step2Schedule({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [showInfo, setShowInfo] = useState(false); // <- painel de informação
 
   /* catálogo de procedimentos */
   useEffect(() => {
@@ -142,12 +146,10 @@ export default function Step2Schedule({
         if (!cancel) setLoading(false);
       }
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
   }, [tenantId]);
 
-  /* ausências do mês para desabilitar dias no calendário */
+  /* ausências do mês (calendário) */
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -163,17 +165,14 @@ export default function Step2Schedule({
 
         const list: string[] = Array.isArray(j.dayOff) ? j.dayOff.map((x: string) => String(x).slice(0, 10)) : [];
         if (!cancel) setDayOffSet(new Set(list));
-      } catch (e) {
-        console.error(e);
+      } catch {
         if (!cancel) setDayOffSet(new Set());
       }
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
   }, [tenantId, monthCursor]);
 
-  /* dados do dia: expediente + exceções + agendamentos */
+  /* dados do dia: base (por dia) + exceções + agendamentos */
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -185,43 +184,63 @@ export default function Step2Schedule({
         const headers = { Authorization: `Bearer ${token}`, "x-tenant-id": tenantId } as any;
 
         const [sched, apps] = await Promise.all([
-          fetch(`${apiBase()}/api/client-portal/schedule/detailed?date=${encodeURIComponent(selectedDate)}`, {
-            headers,
-          }).then(async (r) => {
-            const j = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(j?.error || "Erro ao carregar expediente.");
-            return j;
-          }),
-          fetch(`${apiBase()}/api/client-portal/appointments/day?date=${encodeURIComponent(selectedDate)}`, {
-            headers,
-          }).then(async (r) => {
-            const j = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(j?.error || "Erro ao carregar agendamentos.");
-            return j;
-          }),
+          fetch(`${apiBase()}/api/client-portal/schedule/detailed?date=${encodeURIComponent(selectedDate)}`, { headers })
+            .then(async (r) => {
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j?.error || "Erro ao carregar expediente.");
+              return j;
+            }),
+          fetch(`${apiBase()}/api/client-portal/appointments/day?date=${encodeURIComponent(selectedDate)}`, { headers })
+            .then(async (r) => {
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j?.error || "Erro ao carregar agendamentos.");
+              return j;
+            }),
         ]);
 
         if (cancel) return;
 
-        if (sched?.defaultHours) setDefaultHours(sched.defaultHours);
+        const byDay: DayCfg[] | null = Array.isArray(sched?.defaultHoursByDay)
+          ? (sched.defaultHoursByDay as DayCfg[])
+          : null;
+
+        if (byDay) {
+          setDefaultHoursByDay(byDay);
+          const fd = sched?.forDate as DayCfg | undefined;
+          if (fd && typeof fd.enabled === "boolean") setDayBaseCfg(fd);
+          else {
+            const idx = parseYMD(selectedDate).getDay();
+            setDayBaseCfg(byDay[idx] || { enabled: true, start: "07:00", end: "19:00" });
+          }
+        } else {
+          // legado
+          const legacy = sched?.defaultHours || { start: "07:00", end: "19:00" };
+          const replicated: DayCfg[] = Array.from({ length: 7 }).map(() => ({
+            enabled: true, start: legacy.start, end: legacy.end
+          }));
+          setDefaultHoursByDay(replicated);
+          setDayBaseCfg({ enabled: true, start: legacy.start, end: legacy.end });
+        }
+
         setExceptions(Array.isArray(sched?.exceptions) ? sched.exceptions : []);
         setDayAppointments(Array.isArray(apps?.appointments) ? apps.appointments : []);
-      } catch (e) {
-        console.error(e);
+      } catch {
+        const replicated: DayCfg[] = Array.from({ length: 7 }).map(() => ({
+          enabled: true, start: "07:00", end: "19:00"
+        }));
         if (!cancel) {
-          setExceptions([]);
-          setDayAppointments([]);
+          setDefaultHoursByDay(replicated);
+          setDayBaseCfg({ enabled: true, start: "07:00", end: "19:00" });
+          setExceptions([]); setDayAppointments([]);
         }
       } finally {
         if (!cancel) setLoadingDay(false);
       }
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
   }, [selectedDate, tenantId]);
 
-  /* normaliza exceções: aceita type/kind */
+  /* normaliza exceções */
   const exceptionsNorm = useMemo(
     () =>
       (exceptions || []).map((e: any) => {
@@ -229,7 +248,6 @@ export default function Step2Schedule({
         const rawKind = String(e.kind || "").toLowerCase();
         const isDayOff = rawType === "DAY_OFF" || rawKind === "absent";
         const isAdd = rawType === "ADD" || rawKind === "add";
-        const isRemove = rawType === "REMOVE" || rawKind === "remove";
         return {
           type: isDayOff ? "DAY_OFF" : isAdd ? "ADD" : "REMOVE",
           start: e.start || undefined,
@@ -269,16 +287,20 @@ export default function Step2Schedule({
       .sort((a, b) => a.s - b.s);
   }, [dayAppointments, durationByName]);
 
-  /* janelas válidas do dia (expediente + ADD − REMOVE; DAY_OFF => []) */
-  const isSelectedDayOff = useMemo(
+  /* janelas válidas */
+  const hasDayOffException = useMemo(
     () => (exceptionsNorm || []).some((e) => e.type === "DAY_OFF"),
     [exceptionsNorm]
   );
+  const baseClosed = !dayBaseCfg?.enabled;
 
   const allowedWindows = useMemo(() => {
-    if (isSelectedDayOff) return [] as { s: number; e: number }[];
+    if (hasDayOffException) return [];
 
-    const base = [{ s: minutesFromHHMM(defaultHours.start), e: minutesFromHHMM(defaultHours.end) }];
+    const base: { s: number; e: number }[] =
+      dayBaseCfg?.enabled && dayBaseCfg.start && dayBaseCfg.end
+        ? [{ s: minutesFromHHMM(dayBaseCfg.start), e: minutesFromHHMM(dayBaseCfg.end) }]
+        : [];
 
     const adds = (exceptionsNorm || [])
       .filter((e) => e.type === "ADD" && e.start && e.end)
@@ -289,18 +311,14 @@ export default function Step2Schedule({
       .map((e) => ({ s: minutesFromHHMM(e.start!), e: minutesFromHHMM(e.end!) }));
 
     return subtract(union(base, adds), rems);
-  }, [defaultHours, exceptionsNorm, isSelectedDayOff]);
+  }, [dayBaseCfg, exceptionsNorm, hasDayOffException]);
 
-  const isPastSelectedDay = useMemo(() => {
-    const d = parseYMD(selectedDate);
-    return isPastDay(d);
-  }, [selectedDate]);
+  const isPastSelectedDay = useMemo(() => isPastDay(parseYMD(selectedDate)), [selectedDate]);
 
-  /* slots disponíveis (aplica filtro de "agora" quando for hoje) */
+  /* slots */
   const slots = useMemo(() => {
     if (!requestedMinutes || !allowedWindows.length) return [];
 
-    // se for hoje, só a partir do próximo "degrau" da grade
     const minStartToday = isTodayYMD(selectedDate)
       ? Math.ceil(nowMinutes() / STEP_MIN) * STEP_MIN
       : 0;
@@ -320,10 +338,14 @@ export default function Step2Schedule({
     return result;
   }, [allowedWindows, requestedMinutes, busyBlocks, selectedDate]);
 
-  // "lotado" = não há nenhum slot para a duração pedida
   const isSelectedDayFullyBooked = useMemo(
-    () => !isSelectedDayOff && !isPastSelectedDay && requestedMinutes > 0 && allowedWindows.length > 0 && slots.length === 0,
-    [isSelectedDayOff, isPastSelectedDay, requestedMinutes, allowedWindows, slots]
+    () =>
+      !hasDayOffException &&
+      !isPastSelectedDay &&
+      requestedMinutes > 0 &&
+      slots.length === 0 &&
+      (baseClosed ? true : allowedWindows.length > 0),
+    [hasDayOffException, isPastSelectedDay, requestedMinutes, slots, baseClosed, allowedWindows.length]
   );
 
   /* calendário helpers */
@@ -360,16 +382,10 @@ export default function Step2Schedule({
     const price = selectedProcedures.reduce((s, p) => s + Number(p.price || 0), 0);
     const h = Math.floor((requestedMinutes || 0) / 60);
     const m = (requestedMinutes || 0) % 60;
-    return {
-      count: selectedProcedures.length,
-      durationTxt: `${h}h ${m}m`,
-      priceTxt: BRL.format(price),
-    };
+    return { count: selectedProcedures.length, durationTxt: `${h}h ${m}m`, priceTxt: BRL.format(price) };
   }, [selectedProcedures, requestedMinutes]);
 
-  const goStep = (n: number) => {
-    if (n === 1) onBack?.();
-  };
+  const goStep = (n: number) => { if (n === 1) onBack?.(); };
 
   function askConfirm() {
     if (!pickedTime || saving) return;
@@ -389,27 +405,17 @@ export default function Step2Schedule({
 
       const r = await fetch(`${apiBase()}/api/client-portal/appointments`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "x-tenant-id": tenantId,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "x-tenant-id": tenantId },
         body: JSON.stringify(payload),
       });
 
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Falha ao salvar agendamento.");
 
-      sessionStorage.setItem(
-        "lastCreatedAppointment",
-        JSON.stringify({
-          id: data.id,
-          date: selectedDate,
-          time: pickedTime,
-          total: selectedSummary.priceTxt,
-          procs: selectedProcedures.map((p) => p.name),
-        })
-      );
+      sessionStorage.setItem("lastCreatedAppointment", JSON.stringify({
+        id: data.id, date: selectedDate, time: pickedTime,
+        total: selectedSummary.priceTxt, procs: selectedProcedures.map((p) => p.name),
+      }));
       router.push(`/${tenantId}/novo-agendamento/sucesso`);
     } catch (e: any) {
       setSaveError(e.message || "Erro ao salvar agendamento.");
@@ -419,19 +425,66 @@ export default function Step2Schedule({
     }
   }
 
+    const weeklyLines = useMemo(() => {
+    const src = defaultHoursByDay && defaultHoursByDay.length === 7
+      ? defaultHoursByDay
+      : defaultWeek();
+
+    const order = [1,2,3,4,5,6,0]; // Seg..Dom
+    return order.map((idx) => {
+      const d = src[idx] || { enabled: true, start: "07:00", end: "19:00" };
+      const label = d.enabled && d.start && d.end ? `${d.start}–${d.end}` : "Sem expediente";
+      return { name: DH_NAMES[idx], short: DH_NAMES[idx].slice(0,3), label };
+    });
+  }, [defaultHoursByDay]);
+
   if (loading) return <div>Carregando…</div>;
   const selDateObj = parseYMD(selectedDate);
 
+  const baseLabel =
+    dayBaseCfg?.enabled && dayBaseCfg.start && dayBaseCfg.end ? `${dayBaseCfg.start}–${dayBaseCfg.end}` : "Sem expediente";
+
   const labelWindow =
-    isSelectedDayOff || isPastSelectedDay || isSelectedDayFullyBooked
+    hasDayOffException || isPastSelectedDay || isSelectedDayFullyBooked
       ? "Fechado"
       : allowedWindows.length === 0
-      ? `${defaultHours.start}–${defaultHours.end}`
+      ? baseLabel
       : allowedWindows.map((w) => `${hhmmFromMinutes(w.s)}–${hhmmFromMinutes(w.e)}`).join(" • ");
 
   return (
     <div className="space-y-5 pb-28">
       <StepProgress current={2} onGo={() => goStep(2)} />
+
+      {/* botão (i) no topo */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowInfo((v) => !v)}
+          aria-label="Horários disponíveis"
+          className="w-7 h-7 rounded-full border flex items-center justify-center text-xs hover:bg-gray-50"
+          title="Horários disponíveis"
+        >
+          i
+        </button>
+      </div>
+
+      {/* painel colapsável com os horários por dia */}
+      {showInfo && (
+        <div className="rounded-xl border p-3 bg-amber-50/40">
+          <div className="font-medium text-sm mb-2">Horários disponíveis</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-gray-700">
+            {weeklyLines.map((l) => (
+              <div key={l.name} className="flex justify-between gap-2">
+                <span className="text-gray-600">{l.short}</span>
+                <span className="font-medium">{l.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-gray-500 mt-1">
+            * Pode haver exceções em dias específicos (ausências ou janelas extras).
+          </div>
+        </div>
+      )}
 
       <h2 className="text-lg font-semibold">Escolha o dia e o horário</h2>
 
@@ -463,22 +516,14 @@ export default function Step2Schedule({
 
                 const isDayOffFromMonth = dayOffSet.has(ymd);
                 const past = isPastDay(d);
-
-                // Se for o dia selecionado e o detalhe indicar DAY_OFF, também bloqueia
-                const isDayOff = isDayOffFromMonth || (ymd === selectedDate && isSelectedDayOff) || past;
+                const isDayOff = isDayOffFromMonth || past;
 
                 return (
                   <button
                     key={n}
                     onClick={() => !isDayOff && pickDay(n)}
                     disabled={isDayOff}
-                    title={
-                      past
-                        ? "Dia no passado"
-                        : isDayOffFromMonth || (ymd === selectedDate && isSelectedDayOff)
-                        ? "Dia indisponível (ausência)"
-                        : ""
-                    }
+                    title={past ? "Dia no passado" : isDayOffFromMonth ? "Dia indisponível (ausência)" : ""}
                     className={[
                       "py-2 rounded-lg text-sm border",
                       isDayOff
@@ -510,8 +555,8 @@ export default function Step2Schedule({
 
         {isPastSelectedDay ? (
           <div className="text-sm text-gray-500">Dia no passado — agendamentos não permitidos.</div>
-        ) : isSelectedDayOff || isSelectedDayFullyBooked ? (
-          <div className="text-sm text-gray-500">Dia indisponível para agendamentos.</div>
+        ) : hasDayOffException ? (
+          <div className="text-sm text-gray-500">Dia indisponível para agendamentos (ausência).</div>
         ) : requestedMinutes === 0 ? (
           <div className="text-sm text-gray-500">Selecione pelo menos um procedimento no passo anterior.</div>
         ) : slots.length ? (
@@ -533,7 +578,9 @@ export default function Step2Schedule({
         ) : (
           <div className="text-sm text-gray-500">
             {allowedWindows.length === 0
-              ? "Dia indisponível para agendamentos."
+              ? baseClosed
+                ? "Sem expediente neste dia."
+                : "Dia indisponível para agendamentos."
               : `Sem horários livres para a duração selecionada nas janelas: ${labelWindow}.`}
           </div>
         )}
@@ -565,10 +612,7 @@ export default function Step2Schedule({
               className={`flex-1 rounded-xl border py-3 font-medium ${
                 pickedTime && !saving ? "bg-white hover:bg-gray-50" : "bg-gray-100 text-gray-400"
               }`}
-              style={{
-                borderColor: pickedTime && !saving ? "#bca49d" : "#e5e7eb",
-                color: pickedTime && !saving ? "#9d8983" : undefined,
-              }}
+              style={{ borderColor: pickedTime && !saving ? "#bca49d" : "#e5e7eb", color: pickedTime && !saving ? "#9d8983" : undefined }}
             >
               {saving ? "Salvando..." : "Avançar"}
             </button>
@@ -583,32 +627,16 @@ export default function Step2Schedule({
           <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-lg mx-4">
             <h3 className="font-semibold mb-3">Confirmar agendamento?</h3>
             <div className="text-sm text-gray-700 space-y-1 mb-4">
-              <div>
-                <span className="font-medium">Data:</span> {selDateObj.toLocaleDateString("pt-BR")}
-              </div>
-              <div>
-                <span className="font-medium">Horário:</span> {pickedTime}
-              </div>
-              <div>
-                <span className="font-medium">Procedimentos:</span> {selectedProcedures.map((p) => p.name).join(", ")}
-              </div>
-              <div>
-                <span className="font-medium">Total:</span> {selectedSummary.priceTxt}
-              </div>
+              <div><span className="font-medium">Data:</span> {selDateObj.toLocaleDateString("pt-BR")}</div>
+              <div><span className="font-medium">Horário:</span> {pickedTime}</div>
+              <div><span className="font-medium">Procedimentos:</span> {selectedProcedures.map((p) => p.name).join(", ")}</div>
+              <div><span className="font-medium">Total:</span> {selectedSummary.priceTxt}</div>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50"
-                style={{ borderColor: "#e5e7eb" }}
-              >
+              <button onClick={() => setConfirmOpen(false)} className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50" style={{ borderColor: "#e5e7eb" }}>
                 Revisar
               </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium"
-                style={{ borderColor: "#bca49d", color: "#9d8983" }}
-              >
+              <button onClick={handleSave} className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium" style={{ borderColor: "#bca49d", color: "#9d8983" }}>
                 Confirmar & agendar
               </button>
             </div>
