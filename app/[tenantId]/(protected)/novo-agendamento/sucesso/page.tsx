@@ -62,6 +62,12 @@ function Fireworks({ duration = 2500 }) {
   return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none" />;
 }
 
+function formatYMD(ymd: string) {
+  const [y, m, d] = ymd.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+
 export default function SuccessPage() {
   const { tenantId } = useParams();
   const router = useRouter();
@@ -78,7 +84,7 @@ export default function SuccessPage() {
         <div className="text-2xl font-bold">Agendamento Efetuado! 🎉</div>
         {info && (
           <div className="text-sm text-gray-600">
-            <div><span className="font-medium">Data:</span> {new Date(info.date).toLocaleDateString("pt-BR")}</div>
+            <div><span className="font-medium">Data:</span> {formatYMD(info.date)}</div>
             <div><span className="font-medium">Hora:</span> {info.time}</div>
             <div><span className="font-medium">Procedimentos:</span> {info.procs.join(", ")}</div>
             <div><span className="font-medium">Total:</span> {info.total}</div>
