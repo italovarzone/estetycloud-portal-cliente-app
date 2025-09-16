@@ -10,8 +10,8 @@ type Me = {
   id: string;
   name: string;
   email?: string | null;
-  birthdate?: string | null;   // "YYYY-MM-DD"
-  phone?: string | null;       // dígitos ou máscara
+  birthdate?: string | null;
+  phone?: string | null;
   emailVerified?: boolean;
 };
 
@@ -64,14 +64,13 @@ export default function HomePage() {
     })();
   }, [router, tenantId]);
 
-  // completo = tem nome, email verificado, birthdate e phone válidos
   const isProfileComplete = useMemo(() => {
     if (!me) return false;
     const hasName = !!String(me.name || "").trim();
     const hasEmail = !!String(me.email || "").trim();
     const hasBirth = !!String(me.birthdate || "").trim();
     const phoneDigits = onlyDigits(me.phone || "");
-    const hasPhone = phoneDigits.length >= 10; // BR: 10 ou 11
+    const hasPhone = phoneDigits.length >= 10;
     return hasName && hasEmail && me.emailVerified === true && hasBirth && hasPhone;
   }, [me]);
 
@@ -87,7 +86,6 @@ export default function HomePage() {
     router.replace(`/${tenantId}/login`);
   }
 
-  // fechar menu ao clicar fora
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!menuRef.current) return;
@@ -108,29 +106,29 @@ export default function HomePage() {
   const initials = initialsFromName(me?.name);
 
   return (
-    <main className="min-h-screen bg-[#faf8f7]">
+    <main className="min-h-screen bg-[#faf8f7] overflow-x-hidden">
       {/* Topbar */}
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-[#efe7e5]">
-        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto w-full max-w-5xl px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Image
               src="/assets/images/logo_fundo_transp.png"
               alt="Logo Estety Cloud"
               width={32}
               height={32}
-              className="h-8 w-8 object-contain select-none"
+              className="h-8 w-8 object-contain select-none flex-shrink-0"
               priority
             />
-            <div className="leading-tight">
-              <div className="text-sm font-semibold" style={{ color: "#9d8983" }}>
+            <div className="leading-tight min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: "#9d8983" }}>
                 Estety Cloud
               </div>
-              <div className="text-[11px] text-gray-500">Portal do Cliente</div>
+              <div className="text-[11px] text-gray-500 truncate">Portal do Cliente</div>
             </div>
           </div>
 
           {/* Avatar + menu */}
-          <div className="relative" ref={menuRef}>
+          <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               type="button"
               onClick={() => setMenuOpen((s) => !s)}
@@ -149,7 +147,7 @@ export default function HomePage() {
               {initials ? (
                 <span className="text-sm font-semibold">{initials}</span>
               ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
                   <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
                 </svg>
@@ -159,7 +157,7 @@ export default function HomePage() {
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 mt-2 w-40 rounded-xl border bg-white shadow-lg overflow-hidden"
+                className="absolute right-0 mt-2 w-40 max-w-[calc(100vw-1rem)] rounded-xl border bg-white shadow-lg overflow-hidden"
                 style={{ borderColor: "#efe7e5" }}
               >
                 <button
@@ -186,11 +184,11 @@ export default function HomePage() {
       </header>
 
       {/* Conteúdo */}
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <section className="grid gap-6 md:grid-cols-[1.2fr,1fr]">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <section className="grid gap-6 md:grid-cols-2">
           {/* Cartão perfil */}
-          <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm" style={{ borderColor: "#efe7e5" }}>
-            <div className="flex items-start gap-4">
+          <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
+            <div className="flex items-start gap-4 min-w-0">
               <div
                 className="inline-flex items-center justify-center rounded-full shrink-0"
                 style={{
@@ -200,23 +198,23 @@ export default function HomePage() {
                   color: "#9d8983",
                   border: "1px solid #e9dedb",
                 }}
+                aria-label="Avatar"
               >
                 {initials ? (
                   <span className="text-xl font-semibold">{initials}</span>
                 ) : (
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
                     <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
                   </svg>
                 )}
               </div>
 
-              <div className="min-w-0">
-                <h1 className="text-xl font-semibold" style={{ color: "#1D1411" }}>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-semibold truncate" style={{ color: "#1D1411" }}>
                   Olá, {firstName}! 👋
                 </h1>
 
-                {/* mensagem só quando faltar algo */}
                 {!isProfileComplete && (
                   <p className="text-sm text-gray-600 mt-1">
                     Complete seus dados para liberar agendamentos.
@@ -225,18 +223,24 @@ export default function HomePage() {
 
                 {/* e-mail */}
                 <div className="mt-4 grid gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" className="text-gray-500" fill="none">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" className="text-gray-500 flex-shrink-0" fill="none" aria-hidden>
                       <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.5" />
                       <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" />
                     </svg>
-                    <span className="truncate">{me?.email || "—"}</span>
+                    <span className="truncate flex-1">{me?.email || "—"}</span>
                     {me?.emailVerified ? (
-                      <span className="ml-2 rounded-full border px-2 py-0.5 text-[11px]" style={{ borderColor: "#e9dedb", color: "#03543F", background: "#F3FAF7" }}>
+                      <span
+                        className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
+                        style={{ borderColor: "#e9dedb", color: "#03543F", background: "#F3FAF7" }}
+                      >
                         verificado
                       </span>
                     ) : (
-                      <span className="ml-2 rounded-full border px-2 py-0.5 text-[11px]" style={{ borderColor: "#fde2e2", color: "#b91c1c", background: "#fff1f2" }}>
+                      <span
+                        className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
+                        style={{ borderColor: "#fde2e2", color: "#b91c1c", background: "#fff1f2" }}
+                      >
                         não verificado
                       </span>
                     )}
@@ -248,7 +252,7 @@ export default function HomePage() {
 
           {/* Cartão lateral condicional */}
           {!isProfileComplete ? (
-            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm" style={{ borderColor: "#efe7e5" }}>
+            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
               <h2 className="text-base font-semibold mb-2" style={{ color: "#9d8983" }}>
                 Finalize seu cadastro
               </h2>
@@ -276,7 +280,7 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm" style={{ borderColor: "#efe7e5" }}>
+            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
               <h2 className="text-base font-semibold mb-3" style={{ color: "#9d8983" }}>
                 Ações rápidas
               </h2>
@@ -311,6 +315,12 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Opcional: reforço global contra overflow lateral em mobile */}
+      <style jsx global>{`
+        html, body { overflow-x: hidden; }
+        img, video { max-width: 100%; height: auto; }
+      `}</style>
     </main>
   );
 }
