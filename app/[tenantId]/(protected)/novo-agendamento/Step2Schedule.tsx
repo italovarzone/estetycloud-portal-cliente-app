@@ -49,7 +49,6 @@ function defaultWeek(): DayCfg[] {
   return Array.from({ length: 7 }).map(() => ({ enabled: true, start: "07:00", end: "19:00" }));
 }
 
-
 /** normaliza (ordena + une sobreposições) */
 function normalize(segs: { s: number; e: number }[]) {
   const a = segs.filter((x) => x.e > x.s).sort((x, y) => x.s - y.s);
@@ -128,7 +127,8 @@ export default function Step2Schedule({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [showInfo, setShowInfo] = useState(false); // <- painel de informação
+  const [cancelOpen, setCancelOpen] = useState(false); // << novo: dialog "desistir"
+  const [showInfo, setShowInfo] = useState(false);
 
   /* catálogo de procedimentos */
   useEffect(() => {
@@ -149,7 +149,7 @@ export default function Step2Schedule({
     return () => { cancel = true; };
   }, [tenantId]);
 
-  /* ausências do mês (calendário) */
+  /* ausências do mês */
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -172,7 +172,7 @@ export default function Step2Schedule({
     return () => { cancel = true; };
   }, [tenantId, monthCursor]);
 
-  /* dados do dia: base (por dia) + exceções + agendamentos */
+  /* dados do dia */
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -213,7 +213,6 @@ export default function Step2Schedule({
             setDayBaseCfg(byDay[idx] || { enabled: true, start: "07:00", end: "19:00" });
           }
         } else {
-          // legado
           const legacy = sched?.defaultHours || { start: "07:00", end: "19:00" };
           const replicated: DayCfg[] = Array.from({ length: 7 }).map(() => ({
             enabled: true, start: legacy.start, end: legacy.end
@@ -270,7 +269,7 @@ export default function Step2Schedule({
     [selectedProcedures]
   );
 
-  /* blocos ocupados pelos agendamentos existentes */
+  /* blocos ocupados */
   const busyBlocks = useMemo(() => {
     return (dayAppointments || [])
       .map((ap) => {
@@ -425,7 +424,7 @@ export default function Step2Schedule({
     }
   }
 
-    const weeklyLines = useMemo(() => {
+  const weeklyLines = useMemo(() => {
     const src = defaultHoursByDay && defaultHoursByDay.length === 7
       ? defaultHoursByDay
       : defaultWeek();
@@ -596,7 +595,18 @@ export default function Step2Schedule({
             <span className="font-medium">{selectedSummary.durationTxt}</span> •{" "}
             <span className="font-medium">{selectedSummary.priceTxt}</span>
           </div>
+
           <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(true)}
+              className="w-1/3 rounded-xl border py-3 font-medium bg-white hover:bg-gray-50"
+              style={{ borderColor: "#e5e7eb", color: "#b91c1c" }}
+              title="Desistir deste agendamento"
+            >
+              Desistir
+            </button>
+
             <button
               type="button"
               onClick={onBack}
@@ -605,6 +615,7 @@ export default function Step2Schedule({
             >
               Voltar
             </button>
+
             <button
               type="button"
               disabled={!pickedTime || saving}
@@ -638,6 +649,38 @@ export default function Step2Schedule({
               </button>
               <button onClick={handleSave} className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium" style={{ borderColor: "#bca49d", color: "#9d8983" }}>
                 Confirmar & agendar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal "Desistir" (triste) */}
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setCancelOpen(false)} />
+          <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-lg mx-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl" aria-hidden>😔</span>
+              <h3 className="font-semibold">Desistir do agendamento?</h3>
+            </div>
+            <p className="text-sm text-gray-700 mb-4">
+              Tem certeza de que deseja desistir agora? Você pode voltar e agendar quando quiser.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancelOpen(false)}
+                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50"
+                style={{ borderColor: "#bca49d", color: "#9d8983" }}
+              >
+                Continuar agendando
+              </button>
+              <button
+                onClick={() => router.push(`/${tenantId}/home`)}
+                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium"
+                style={{ borderColor: "#fde2e2", color: "#b91c1c" }}
+              >
+                Sim, desistir
               </button>
             </div>
           </div>

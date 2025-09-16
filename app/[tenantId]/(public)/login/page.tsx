@@ -65,14 +65,14 @@ export default function LoginPage() {
           {/* Brand */}
           <div className="flex flex-col items-center text-center mb-6">
             <div className="relative h-14 w-14 mb-3">
-            <Image
-              src="/assets/images/logo_fundo_transp.png"
-              alt="Logo Estety Cloud"
-              width={56}
-              height={56}
-              className="h-14 w-14 object-contain select-none"
-              priority
-            />
+              <Image
+                src="/assets/images/logo_fundo_transp.png"
+                alt="Logo Estety Cloud"
+                width={56}
+                height={56}
+                className="h-14 w-14 object-contain select-none"
+                priority
+              />
             </div>
             <h1 className="text-lg font-semibold" style={{ color: "#9d8983" }}>
               Estety Cloud
@@ -194,6 +194,19 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Link para registro */}
+          <p className="text-center text-sm text-gray-500 mt-4">
+            Não tem conta? {" "}
+            <button
+              type="button"
+              onClick={() => router.push(`/${tenantId}/registrar`)}
+              className="text-brand hover:underline"
+              style={{ color: "#9d8983" }}
+            >
+              Entre já e agende.
+            </button>
+          </p>
         </div>
 
         {/* Rodapé pequeno */}
