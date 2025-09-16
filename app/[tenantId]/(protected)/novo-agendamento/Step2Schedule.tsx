@@ -513,16 +513,35 @@ export default function Step2Schedule({
                   selDateObj.getMonth() === monthCursor.getMonth() &&
                   selDateObj.getDate() === n;
 
-                const isDayOffFromMonth = dayOffSet.has(ymd);
-                const past = isPastDay(d);
-                const isDayOff = isDayOffFromMonth || past;
+                  const isDayOffFromMonth = dayOffSet.has(ymd);
+                  const past = isPastDay(d);
+
+                  // verifica se o dia da semana no defaultHoursByDay está desativado
+                  let isDefaultClosed = false;
+                  if (defaultHoursByDay && defaultHoursByDay.length === 7) {
+                    const idx = d.getDay(); // 0=Dom ... 6=Sáb
+                    isDefaultClosed = defaultHoursByDay[idx]?.enabled === false;
+                  }
+
+                  const isAbsentException = exceptionsNorm.some(
+                    (e) => e.type === "DAY_OFF" && ymd === selectedDate
+                  );
+
+                  const isDayOff = past || isDayOffFromMonth || isDefaultClosed || isAbsentException;
+
 
                 return (
                   <button
                     key={n}
                     onClick={() => !isDayOff && pickDay(n)}
                     disabled={isDayOff}
-                    title={past ? "Dia no passado" : isDayOffFromMonth ? "Dia indisponível (ausência)" : ""}
+                    title={
+                      past
+                        ? "Dia no passado"
+                        : isDayOffFromMonth || isAbsentException
+                        ? "Dia indisponível (ausência)"
+                        : ""
+                    }
                     className={[
                       "py-2 rounded-lg text-sm border",
                       isDayOff
