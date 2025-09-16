@@ -23,11 +23,40 @@ function onlyDigits(s: string) {
   return String(s || "").replace(/\D+/g, "");
 }
 
+/** Skeletons */
+function SkeletonProfileCard() {
+  return (
+    <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm" style={{ borderColor: "#efe7e5" }}>
+      <div className="flex items-start gap-4 min-w-0 animate-pulse">
+        <div className="h-16 w-16 rounded-full bg-gray-200" />
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="h-5 w-2/3 rounded bg-gray-200" />
+          <div className="h-4 w-4/5 rounded bg-gray-100" />
+          <div className="h-4 w-full rounded bg-gray-100" />
+          <div className="h-4 w-2/3 rounded bg-gray-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+function SkeletonSideCard() {
+  return (
+    <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm animate-pulse" style={{ borderColor: "#efe7e5" }}>
+      <div className="h-5 w-1/2 rounded bg-gray-200 mb-3" />
+      <div className="h-4 w-full rounded bg-gray-100 mb-2" />
+      <div className="h-4 w-5/6 rounded bg-gray-100 mb-4" />
+      <div className="h-10 w-full rounded-xl bg-gray-200" />
+      <div className="h-10 w-full rounded-xl bg-gray-200 mt-3" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { tenantId } = useParams<{ tenantId: string }>();
 
   const [me, setMe] = useState<Me | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,6 +69,7 @@ export default function HomePage() {
     }
     (async () => {
       try {
+        setLoading(true);
         const r = await fetch(`${API}/api/client-portal/me`, {
           headers: {
             "Content-Type": "application/json",
@@ -60,6 +90,8 @@ export default function HomePage() {
         });
       } catch (err: any) {
         setError(err.message || "Falha ao carregar");
+      } finally {
+        setLoading(false);
       }
     })();
   }, [router, tenantId]);
@@ -185,128 +217,135 @@ export default function HomePage() {
 
       {/* Conteúdo */}
       <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <section className="grid gap-6 md:grid-cols-2">
-          {/* Cartão perfil */}
-          <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
-            <div className="flex items-start gap-4 min-w-0">
-              <div
-                className="inline-flex items-center justify-center rounded-full shrink-0"
-                style={{
-                  width: 64,
-                  height: 64,
-                  background: "#f4eeec",
-                  color: "#9d8983",
-                  border: "1px solid #e9dedb",
-                }}
-                aria-label="Avatar"
-              >
-                {initials ? (
-                  <span className="text-xl font-semibold">{initials}</span>
-                ) : (
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
-                  </svg>
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-semibold truncate" style={{ color: "#1D1411" }}>
-                  Olá, {firstName}! 👋
-                </h1>
-
-                {!isProfileComplete && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Complete seus dados para liberar agendamentos.
-                  </p>
-                )}
-
-                {/* e-mail */}
-                <div className="mt-4 grid gap-2 text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <svg width="16" height="16" viewBox="0 0 24 24" className="text-gray-500 flex-shrink-0" fill="none" aria-hidden>
-                      <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" />
+        {loading ? (
+          <section className="grid gap-6 md:grid-cols-2">
+            <SkeletonProfileCard />
+            <SkeletonSideCard />
+          </section>
+        ) : (
+          <section className="grid gap-6 md:grid-cols-2">
+            {/* Cartão perfil */}
+            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
+              <div className="flex items-start gap-4 min-w-0">
+                <div
+                  className="inline-flex items-center justify-center rounded-full shrink-0"
+                  style={{
+                    width: 64,
+                    height: 64,
+                    background: "#f4eeec",
+                    color: "#9d8983",
+                    border: "1px solid #e9dedb",
+                  }}
+                  aria-label="Avatar"
+                >
+                  {initials ? (
+                    <span className="text-xl font-semibold">{initials}</span>
+                  ) : (
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
                     </svg>
-                    <span className="truncate flex-1">{me?.email || "—"}</span>
-                    {me?.emailVerified ? (
-                      <span
-                        className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
-                        style={{ borderColor: "#e9dedb", color: "#03543F", background: "#F3FAF7" }}
-                      >
-                        verificado
-                      </span>
-                    ) : (
-                      <span
-                        className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
-                        style={{ borderColor: "#fde2e2", color: "#b91c1c", background: "#fff1f2" }}
-                      >
-                        não verificado
-                      </span>
-                    )}
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-xl font-semibold truncate" style={{ color: "#1D1411" }}>
+                    Olá, {firstName}! 👋
+                  </h1>
+
+                  {!isProfileComplete && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Complete seus dados para liberar agendamentos.
+                    </p>
+                  )}
+
+                  {/* e-mail */}
+                  <div className="mt-4 grid gap-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" className="text-gray-500 flex-shrink-0" fill="none" aria-hidden>
+                        <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.5" />
+                        <path d="M4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" />
+                      </svg>
+                      <span className="truncate flex-1">{me?.email || "—"}</span>
+                      {me?.emailVerified ? (
+                        <span
+                          className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
+                          style={{ borderColor: "#e9dedb", color: "#03543F", background: "#F3FAF7" }}
+                        >
+                          verificado
+                        </span>
+                      ) : (
+                        <span
+                          className="ml-2 rounded-full border px-2 py-0.5 text-[11px] flex-shrink-0"
+                          style={{ borderColor: "#fde2e2", color: "#b91c1c", background: "#fff1f2" }}
+                        >
+                          não verificado
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Cartão lateral condicional */}
-          {!isProfileComplete ? (
-            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
-              <h2 className="text-base font-semibold mb-2" style={{ color: "#9d8983" }}>
-                Finalize seu cadastro
-              </h2>
-              <p className="text-sm text-gray-600">
-                Preencha data de nascimento, WhatsApp e verifique seu e-mail para liberar os agendamentos.
-              </p>
+            {/* Cartão lateral condicional */}
+            {!isProfileComplete ? (
+              <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
+                <h2 className="text-base font-semibold mb-2" style={{ color: "#9d8983" }}>
+                  Finalize seu cadastro
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Preencha data de nascimento, WhatsApp e verifique seu e-mail para liberar os agendamentos.
+                </p>
 
-              <div className="mt-4 grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => go("/perfil")}
-                  className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
-                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                >
-                  Completar agora
-                </button>
-                <button
-                  type="button"
-                  onClick={() => go("/perfil/senha")}
-                  className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
-                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                >
-                  Alterar senha
-                </button>
+                <div className="mt-4 grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => go("/perfil")}
+                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Completar agora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => go("/perfil/senha")}
+                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Alterar senha
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
-              <h2 className="text-base font-semibold mb-3" style={{ color: "#9d8983" }}>
-                Ações rápidas
-              </h2>
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => go("/novo-agendamento")}
-                  className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
-                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                >
-                  Agendar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => go("/meus-agendamentos")}
-                  className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
-                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                >
-                  Meus agendamentos
-                </button>
+            ) : (
+              <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
+                <h2 className="text-base font-semibold mb-3" style={{ color: "#9d8983" }}>
+                  Ações rápidas
+                </h2>
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => go("/novo-agendamento")}
+                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Agendar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => go("/meus-agendamentos")}
+                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Meus agendamentos
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+        )}
 
-        {error && (
+        {error && !loading && (
           <div
             className="mt-6 rounded-xl border px-4 py-3 text-sm"
             style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
@@ -316,7 +355,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Opcional: reforço global contra overflow lateral em mobile */}
+      {/* Reforço global contra overflow lateral em mobile */}
       <style jsx global>{`
         html, body { overflow-x: hidden; }
         img, video { max-width: 100%; height: auto; }

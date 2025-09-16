@@ -56,6 +56,9 @@ export default function ProfilePage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
+  // carregamento
+  const [loading, setLoading] = useState(true);
+
   // verificação de e-mail
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyInfo, setVerifyInfo] = useState("");
@@ -87,6 +90,7 @@ export default function ProfilePage() {
     }
     (async () => {
       try {
+        setLoading(true);
         const r = await fetch(`${API}/api/client-portal/me`, {
           headers: {
             "Content-Type": "application/json",
@@ -112,6 +116,8 @@ export default function ProfilePage() {
         setPhone(onlyDigits(data.phone || "")); // garante só dígitos
       } catch (err: any) {
         setError(err.message || "Falha ao carregar");
+      } finally {
+        setLoading(false);
       }
     })();
 
@@ -348,226 +354,252 @@ export default function ProfilePage() {
           className="rounded-2xl border bg-white/90 backdrop-blur p-4 sm:p-6 shadow-sm"
           style={{ borderColor: "#efe7e5" }}
         >
-          {/* Header com avatar */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-5">
-            <div
-              className="inline-flex items-center justify-center rounded-full shrink-0"
-              style={{
-                width: 56,
-                height: 56,
-                background: "#f4eeec",
-                color: "#9d8983",
-                border: "1px solid #e9dedb",
-              }}
-              aria-label="Avatar"
-            >
-              {initials ? (
-                <span className="text-lg font-semibold">{initials}</span>
-              ) : (
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="text-base font-semibold truncate" style={{ color: "#1D1411" }}>
-                {name || me?.name || "Seu nome"}
-              </div>
-              <div className="text-xs text-gray-500">
-                Atualize suas informações de contato e e-mail.
-              </div>
-            </div>
-          </div>
-
-          {/* Form principal */}
-          <form onSubmit={handleSave} className="grid gap-4">
-            {/* Nome */}
-            <div className="min-w-0">
-              <label className="block text-sm mb-1">Nome</label>
-              <input
-                className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
-                style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-                placeholder="Seu nome"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            {/* Linha responsiva com 2 colunas a partir do sm */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Data de nascimento */}
-              <div className="min-w-0">
-                <label className="block text-sm mb-1">Data de nascimento</label>
-                <input
-                  inputMode="numeric"
-                  pattern="[0-9/]*"
-                  maxLength={10}
-                  className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
-                  style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-                  placeholder="DD/MM/AAAA"
-                  value={birthdate}
-                  onChange={(e) => {
-                    let v = e.target.value.replace(/\D+/g, "").slice(0, 8);
-                    if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1/$2/$3");
-                    else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, "$1/$2");
-                    setBirthdate(v);
-                  }}
-                />
+          {/* ======= Skeleton enquanto carrega ======= */}
+          {loading ? (
+            <div className="animate-pulse">
+              <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-5">
+                <div className="rounded-full bg-gray-200" style={{ width: 56, height: 56 }} />
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 w-40 max-w-[60%] bg-gray-200 rounded mb-2" />
+                  <div className="h-3 w-64 max-w-full bg-gray-100 rounded" />
+                </div>
               </div>
 
-              {/* WhatsApp */}
-              <div className="min-w-0">
-                <label className="block text-sm mb-1">WhatsApp</label>
-                <input
-                  inputMode="tel"
-                  autoComplete="tel"
-                  className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
-                  style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-                  placeholder="(11) 98888-7777"
-                  value={phoneMasked}
-                  onChange={(e) => setPhone(onlyDigits(e.target.value))}
-                />
+              <div className="space-y-4">
+                <div className="h-10 w-full bg-gray-100 rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="h-10 w-full bg-gray-100 rounded" />
+                  <div className="h-10 w-full bg-gray-100 rounded" />
+                </div>
+                <div className="h-10 w-full bg-gray-100 rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="h-10 w-full bg-gray-100 rounded" />
+                  <div className="h-10 w-full bg-gray-100 rounded" />
+                </div>
               </div>
             </div>
-
-            {/* Email + Verificação */}
-            <div className="min-w-0">
-              <label className="block text-sm mb-1">Email</label>
-              <input
-                type="email"
-                autoComplete="email"
-                className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
-                style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-                placeholder="email@exemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-
-              {/* bloco de verificação aparece só se não verificado */}
-              {me?.emailVerified === false && (
+          ) : (
+            <>
+              {/* Header com avatar */}
+              <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-5">
                 <div
-                  className="mt-3 rounded-xl border p-3 sm:p-4 bg-white"
-                  style={{ borderColor: "#efe7e5" }}
+                  className="inline-flex items-center justify-center rounded-full shrink-0"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    background: "#f4eeec",
+                    color: "#9d8983",
+                    border: "1px solid #e9dedb",
+                  }}
+                  aria-label="Avatar"
                 >
-                  <div className="text-sm font-medium mb-2" style={{ color: "#9d8983" }}>
-                    Verifique seu e-mail
+                  {initials ? (
+                    <span className="text-lg font-semibold">{initials}</span>
+                  ) : (
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-base font-semibold truncate" style={{ color: "#1D1411" }}>
+                    {name || me?.name || "Seu nome"}
                   </div>
+                  <div className="text-xs text-gray-500">Atualize suas informações de contato e e-mail.</div>
+                </div>
+              </div>
 
-                  {/* Mobile: empilha | Desktop: lado a lado */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSendCode}
-                      disabled={cooldown > 0}
-                      className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
-                      style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                    >
-                      {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Enviar código"}
-                    </button>
+              {/* Form principal */}
+              <form onSubmit={handleSave} className="grid gap-4">
+                {/* Nome */}
+                <div className="min-w-0">
+                  <label className="block text-sm mb-1">Nome</label>
+                  <input
+                    className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                    style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                    placeholder="Seu nome"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
 
+                {/* Linha responsiva com 2 colunas a partir do sm */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Data de nascimento */}
+                  <div className="min-w-0">
+                    <label className="block text-sm mb-1">Data de nascimento</label>
                     <input
                       inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={5}
-                      className="w-full sm:w-24 rounded-lg border px-3 py-2 outline-none"
-                      style={{ borderColor: "#e5e7eb", caretColor: "#9d8983", letterSpacing: "0.25em" }}
-                      placeholder="00000"
-                      value={verifyCode}
-                      onChange={(e) => setVerifyCode(only5Digits(e.target.value))}
+                      pattern="[0-9/]*"
+                      maxLength={10}
+                      className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                      style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                      placeholder="DD/MM/AAAA"
+                      value={birthdate}
+                      onChange={(e) => {
+                        let v = e.target.value.replace(/\D+/g, "").slice(0, 8);
+                        if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1/$2/$3");
+                        else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, "$1/$2");
+                        setBirthdate(v);
+                      }}
                     />
-
-                    <button
-                      type="button"
-                      onClick={handleVerify}
-                      className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50"
-                      style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                    >
-                      Verificar
-                    </button>
                   </div>
 
-                  {verifyError && (
-                    <div
-                      className="mt-2 rounded-lg border px-3 py-2 text-sm"
-                      style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
-                    >
-                      {verifyError}
-                    </div>
-                  )}
-                  {verifyInfo && (
-                    <div
-                      className="mt-2 rounded-lg border px-3 py-2 text-sm"
-                      style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
-                    >
-                      {verifyInfo}
-                    </div>
-                  )}
-
-                  <p className="text-[11px] text-gray-500 mt-2">
-                    Se mudar o e-mail, vamos pedir verificação novamente.
-                  </p>
+                  {/* WhatsApp */}
+                  <div className="min-w-0">
+                    <label className="block text-sm mb-1">WhatsApp</label>
+                    <input
+                      inputMode="tel"
+                      autoComplete="tel"
+                      className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                      style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                      placeholder="(11) 98888-7777"
+                      value={phoneMasked}
+                      onChange={(e) => setPhone(onlyDigits(e.target.value))}
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* mensagens gerais */}
-            {error && (
-              <div
-                className="rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
-              >
-                {error}
-              </div>
-            )}
-            {msg && (
-              <div
-                className="rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
-              >
-                {msg}
-              </div>
-            )}
+                {/* Email + Verificação */}
+                <div className="min-w-0">
+                  <label className="block text-sm mb-1">Email</label>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                    style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                    placeholder="email@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
 
-            {/* Ações */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-1">
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition disabled:opacity-60"
-                style={{ borderColor: "#bca49d", color: "#9d8983" }}
-              >
-                {saving ? (
-                  <span className="inline-flex items-center gap-2">
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="#e5e7eb" strokeWidth="4" />
-                      <path d="M22 12a10 10 0 0 1-10 10" stroke="#bca49d" strokeWidth="4" />
-                    </svg>
-                    Salvando…
-                  </span>
-                ) : (
-                  "Salvar alterações"
+                  {/* bloco de verificação aparece só se não verificado */}
+                  {me?.emailVerified === false && (
+                    <div
+                      className="mt-3 rounded-xl border p-3 sm:p-4 bg-white"
+                      style={{ borderColor: "#efe7e5" }}
+                    >
+                      <div className="text-sm font-medium mb-2" style={{ color: "#9d8983" }}>
+                        Verifique seu e-mail
+                      </div>
+
+                      {/* Mobile: empilha | Desktop: lado a lado */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSendCode}
+                          disabled={cooldown > 0}
+                          className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
+                          style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                        >
+                          {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Enviar código"}
+                        </button>
+
+                        <input
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={5}
+                          className="w-full sm:w-24 rounded-lg border px-3 py-2 outline-none"
+                          style={{ borderColor: "#e5e7eb", caretColor: "#9d8983", letterSpacing: "0.25em" }}
+                          placeholder="00000"
+                          value={verifyCode}
+                          onChange={(e) => setVerifyCode(only5Digits(e.target.value))}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleVerify}
+                          className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50"
+                          style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                        >
+                          Verificar
+                        </button>
+                      </div>
+
+                      {verifyError && (
+                        <div
+                          className="mt-2 rounded-lg border px-3 py-2 text-sm"
+                          style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
+                        >
+                          {verifyError}
+                        </div>
+                      )}
+                      {verifyInfo && (
+                        <div
+                          className="mt-2 rounded-lg border px-3 py-2 text-sm"
+                          style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
+                        >
+                          {verifyInfo}
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-gray-500 mt-2">
+                        Se mudar o e-mail, vamos pedir verificação novamente.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* mensagens gerais */}
+                {error && (
+                  <div
+                    className="rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
+                  >
+                    {error}
+                  </div>
                 )}
-              </button>
+                {msg && (
+                  <div
+                    className="rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
+                  >
+                    {msg}
+                  </div>
+                )}
 
-              <button
-                type="button"
-                onClick={openPwd}
-                className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition"
-                style={{ borderColor: "#bca49d", color: "#9d8983" }}
-              >
-                Alterar senha
-              </button>
-            </div>
-          </form>
+                {/* Ações */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition disabled:opacity-60"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    {saving ? (
+                      <span className="inline-flex items-center gap-2">
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="#e5e7eb" strokeWidth="4" />
+                          <path d="M22 12a10 10 0 0 1-10 10" stroke="#bca49d" strokeWidth="4" />
+                        </svg>
+                        Salvando…
+                      </span>
+                    ) : (
+                      "Salvar alterações"
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openPwd}
+                    className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Alterar senha
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </div>
 
