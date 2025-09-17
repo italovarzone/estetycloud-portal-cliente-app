@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 function apiBase() {
@@ -57,6 +57,17 @@ export default function MeusAgendamentos() {
   const [filtroData, setFiltroData] = useState("");
   const [filtroHora, setFiltroHora] = useState("");
 
+  // menu ⋮
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const menusRef = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const btnsRef = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+
+  // modal cancelar
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
   useEffect(() => {
     async function load() {
       try {
@@ -83,6 +94,20 @@ export default function MeusAgendamentos() {
     }
     load();
   }, [tenantId, router]);
+
+  // fecha menus ao clicar fora
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuOpenId) return;
+      const menuEl = menusRef.current.get(menuOpenId);
+      const btnEl = btnsRef.current.get(menuOpenId);
+      const target = e.target as Node;
+      if (menuEl?.contains(target) || btnEl?.contains(target)) return;
+      setMenuOpenId(null);
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [menuOpenId]);
 
   // aplica filtros
   const filtered = useMemo(() => {
@@ -112,14 +137,12 @@ export default function MeusAgendamentos() {
   function handleReschedule(ap: any) {
     if (ap.cancelado || ap.concluida) return;
     try {
-      // guardo o snapshot pro Step1/Step2 (fallback caso o usuário recarregue a página)
       const payload = {
         _id: ap._id,
         date: ap.date,
         time: ap.time,
-        // procedures no histórico têm { name, price, procedureId? }
         procedures: Array.isArray(ap.procedures) ? ap.procedures.map((p: any) => ({
-          _id: String(p.procedureId || p._id || ""), // para casar com o catálogo
+          _id: String(p.procedureId || p._id || ""),
           procedureId: String(p.procedureId || p._id || ""),
           name: p.name,
           price: Number(p.price || 0),
@@ -128,6 +151,42 @@ export default function MeusAgendamentos() {
       sessionStorage.setItem("editAppointment", JSON.stringify(payload));
     } catch {}
     router.push(`/${tenantId}/novo-agendamento?edit=${encodeURIComponent(ap._id)}`);
+  }
+
+  // ===== CANCELAR (modal + chamada) =====
+  function openCancel(ap: any) {
+    setMenuOpenId(null);
+    setCancelTarget(ap);
+    setCancelError("");
+    setCancelOpen(true);
+  }
+  async function confirmCancel() {
+    if (!cancelTarget?._id) return;
+    const token = localStorage.getItem("clientPortalToken") || "";
+    try {
+      setCancelLoading(true);
+      setCancelError("");
+      const r = await fetch(`${apiBase()}/api/client-portal/appointments/${encodeURIComponent(cancelTarget._id)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-tenant-id": String(tenantId || ""),
+        },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "Falha ao cancelar agendamento.");
+
+      // marca no estado local
+      setAppointments((prev) =>
+        prev.map((a) => (a._id === cancelTarget._id ? { ...a, cancelado: true } : a))
+      );
+      setCancelOpen(false);
+      setCancelTarget(null);
+    } catch (e: any) {
+      setCancelError(e?.message || "Erro ao cancelar agendamento.");
+    } finally {
+      setCancelLoading(false);
+    }
   }
 
   return (
@@ -167,35 +226,79 @@ export default function MeusAgendamentos() {
         ) : agendados.length === 0 ? (
           <div className="text-gray-500 text-sm">Nenhum agendamento ativo.</div>
         ) : (
-          agendados.map((ap: any) => (
-            <div key={ap._id} className="rounded-lg border p-3 bg-white shadow-sm">
-              <div className="flex justify-between items-start gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium">
-                    {String(ap.date).split("-").reverse().join("/")} às {ap.time}
+          agendados.map((ap: any) => {
+            const menuOpen = menuOpenId === ap._id;
+            return (
+              <div key={ap._id} className="rounded-lg border p-3 bg-white shadow-sm relative">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      {String(ap.date).split("-").reverse().join("/")} às {ap.time}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {(ap.procedures || []).map((p: any) => p.name).join(", ") || ap.procedure}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Valor total: {BRL.format(Number(ap.valor_total || 0))}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {(ap.procedures || []).map((p: any) => p.name).join(", ") || ap.procedure}
+
+                  {/* Status + menu ⋮ */}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className={`text-sm font-medium ${statusColor(ap)}`}>{statusLabel(ap)}</div>
+
+                    {!ap.cancelado && !ap.concluida && (
+                      <div className="relative">
+                        <button
+                          ref={(el) => { btnsRef.current.set(ap._id, el); }}
+                          type="button"
+                          aria-label="Mais ações"
+                          aria-expanded={menuOpen}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuOpenId(menuOpen ? null : ap._id);
+                          }}
+                          className="rounded-md border p-1.5 hover:bg-gray-50"
+                          style={{ borderColor: "#e5e7eb" }}
+                          title="Mais ações"
+                        >
+                          {/* ícone ⋮ */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM10 11.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM10 17a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+                          </svg>
+                        </button>
+
+                        {menuOpen && (
+                          <div
+                            ref={(el) => { menusRef.current.set(ap._id, el); }}
+                            className="absolute right-0 mt-2 w-40 rounded-lg border bg-white shadow-lg z-10"
+                            style={{ borderColor: "#e5e7eb" }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleReschedule(ap)}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                            >
+                              Reagendar
+                            </button>
+                            <div className="h-px bg-gray-100" />
+                            <button
+                              type="button"
+                              onClick={() => openCancel(ap)}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                              style={{ color: "#b91c1c" }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Valor total: {BRL.format(Number(ap.valor_total || 0))}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className={`text-sm font-medium ${statusColor(ap)}`}>{statusLabel(ap)}</div>
-                  <button
-                    type="button"
-                    onClick={() => handleReschedule(ap)}
-                    className="rounded-lg border px-3 py-1.5 text-sm bg-white hover:bg-gray-50"
-                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                    title="Reagendar este horário"
-                  >
-                    Reagendar
-                  </button>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </section>
 
@@ -249,6 +352,44 @@ export default function MeusAgendamentos() {
         </button>
       </div>
 
+      {/* Modal cancelar */}
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setCancelOpen(false)} />
+          <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-lg mx-4">
+            <h3 className="font-semibold mb-2">Cancelar agendamento?</h3>
+            <p className="text-sm text-gray-700">
+              Vamos avisar a profissional sobre o cancelamento do seu horário
+              {cancelTarget ? <> em <strong>{String(cancelTarget.date).split("-").reverse().join("/")}</strong> às <strong>{cancelTarget.time}</strong></> : null}.
+            </p>
+            {cancelError && (
+              <div className="mt-3 rounded-lg border px-3 py-2 text-sm"
+                   style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}>
+                {cancelError}
+              </div>
+            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setCancelOpen(false)}
+                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50"
+                style={{ borderColor: "#e5e7eb" }}
+              >
+                Manter
+              </button>
+              <button
+                onClick={confirmCancel}
+                disabled={cancelLoading}
+                className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium"
+                style={{ borderColor: "#fde2e2", color: "#b91c1c" }}
+              >
+                {cancelLoading ? "Cancelando..." : "Cancelar agendamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* overflow guard mobile */}
       <style jsx global>{` html, body { overflow-x: hidden; } `}</style>
     </div>
   );
