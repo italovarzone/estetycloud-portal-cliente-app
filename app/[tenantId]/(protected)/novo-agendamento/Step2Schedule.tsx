@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import StepProgress from "../components/StepProgress";
 
 /* ===== helpers ===== */
@@ -102,6 +102,21 @@ export default function Step2Schedule({
 }) {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
+  const search = useSearchParams();
+  const editId = search.get("edit"); // se presente, estamos REAGENDANDO
+  const isEditing = !!editId;
+
+  // agendamento original (preenchido pela tela "meus-agendamentos")
+  const [editingAppt, setEditingAppt] = useState<any>(null);
+  useEffect(() => {
+    if (!isEditing) return;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem("editAppointment") || "null");
+      if (cached && String(cached._id) === String(editId)) {
+        setEditingAppt(cached);
+      }
+    } catch {}
+  }, [isEditing, editId]);
 
   // calendário
   const [monthCursor, setMonthCursor] = useState(() => {
@@ -111,6 +126,18 @@ export default function Step2Schedule({
     return d;
   });
   const [selectedDate, setSelectedDate] = useState(() => toYMD(new Date()));
+  // prefila data com a original (uma única vez)
+  const appliedOriginalDateRef = useRef(false);
+  useEffect(() => {
+    if (!isEditing || !editingAppt || appliedOriginalDateRef.current) return;
+    if (editingAppt.date) {
+      setSelectedDate(String(editingAppt.date));
+      const d = parseYMD(String(editingAppt.date));
+      const m = new Date(d.getFullYear(), d.getMonth(), 1);
+      setMonthCursor(m);
+    }
+    appliedOriginalDateRef.current = true;
+  }, [isEditing, editingAppt]);
 
   // dados
   const [allProcedures, setAllProcedures] = useState<any[]>([]);
@@ -127,7 +154,7 @@ export default function Step2Schedule({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false); // << novo: dialog "desistir"
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
   /* catálogo de procedimentos */
@@ -269,9 +296,18 @@ export default function Step2Schedule({
     [selectedProcedures]
   );
 
+  /* lista efetiva do dia (ignora o próprio agendamento quando editando) */
+  const effectiveDayAppointments = useMemo(() => {
+    let list = Array.isArray(dayAppointments) ? dayAppointments : [];
+    if (isEditing && editingAppt && selectedDate === String(editingAppt.date)) {
+      list = list.filter((a: any) => String(a._id) !== String(editingAppt._id));
+    }
+    return list;
+  }, [dayAppointments, isEditing, editingAppt, selectedDate]);
+
   /* blocos ocupados */
   const busyBlocks = useMemo(() => {
-    return (dayAppointments || [])
+    return (effectiveDayAppointments || [])
       .map((ap) => {
         let dur = 0;
         if (Array.isArray(ap.procedures) && ap.procedures.length) {
@@ -284,7 +320,7 @@ export default function Step2Schedule({
       })
       .filter((b) => b.e > b.s)
       .sort((a, b) => a.s - b.s);
-  }, [dayAppointments, durationByName]);
+  }, [effectiveDayAppointments, durationByName]);
 
   /* janelas válidas */
   const hasDayOffException = useMemo(
@@ -347,6 +383,17 @@ export default function Step2Schedule({
     [hasDayOffException, isPastSelectedDay, requestedMinutes, slots, baseClosed, allowedWindows.length]
   );
 
+  // pré-seleciona automaticamente o horário original, se ainda válido
+  const appliedOriginalTimeRef = useRef(false);
+  useEffect(() => {
+    if (!isEditing || !editingAppt) return;
+    if (appliedOriginalTimeRef.current) return;
+    if (selectedDate === String(editingAppt.date) && slots.includes(String(editingAppt.time))) {
+      setPickedTime(String(editingAppt.time));
+      appliedOriginalTimeRef.current = true;
+    }
+  }, [isEditing, editingAppt, selectedDate, slots]);
+
   /* calendário helpers */
   function monthLabel(d: Date) {
     return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -402,22 +449,40 @@ export default function Step2Schedule({
         procedures: selectedProcedures.map((p) => ({ _id: p._id, name: p.name, price: p.price })),
       };
 
-      const r = await fetch(`${apiBase()}/api/client-portal/appointments`, {
-        method: "POST",
+      const url = isEditing
+        ? `${apiBase()}/api/client-portal/appointments/${encodeURIComponent(String(editId!))}`
+        : `${apiBase()}/api/client-portal/appointments`;
+
+      const r = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "x-tenant-id": tenantId },
         body: JSON.stringify(payload),
       });
 
       const data = await r.json();
-      if (!r.ok) throw new Error(data?.error || "Falha ao salvar agendamento.");
+      if (!r.ok) throw new Error(data?.error || (isEditing ? "Falha ao salvar alterações." : "Falha ao salvar agendamento."));
 
-      sessionStorage.setItem("lastCreatedAppointment", JSON.stringify({
-        id: data.id, date: selectedDate, time: pickedTime,
-        total: selectedSummary.priceTxt, procs: selectedProcedures.map((p) => p.name),
-      }));
-      router.push(`/${tenantId}/novo-agendamento/sucesso`);
+      if (isEditing) {
+        sessionStorage.setItem(
+          "lastEditedAppointment",
+          JSON.stringify({
+            id: editId,
+            from: { date: String(editingAppt?.date), time: String(editingAppt?.time) },
+            to: { date: selectedDate, time: pickedTime },
+            procs: selectedProcedures.map((p) => p.name),
+            total: selectedSummary.priceTxt,
+          })
+        );
+        router.push(`/${tenantId}/novo-agendamento/sucesso?edit=1`);
+      } else {
+        sessionStorage.setItem("lastCreatedAppointment", JSON.stringify({
+          id: data.id, date: selectedDate, time: pickedTime,
+          total: selectedSummary.priceTxt, procs: selectedProcedures.map((p) => p.name),
+        }));
+        router.push(`/${tenantId}/novo-agendamento/sucesso`);
+      }
     } catch (e: any) {
-      setSaveError(e.message || "Erro ao salvar agendamento.");
+      setSaveError(e.message || (isEditing ? "Erro ao salvar alterações." : "Erro ao salvar agendamento."));
     } finally {
       setSaving(false);
       setConfirmOpen(false);
@@ -450,9 +515,24 @@ export default function Step2Schedule({
       ? baseLabel
       : allowedWindows.map((w) => `${hhmmFromMinutes(w.s)}–${hhmmFromMinutes(w.e)}`).join(" • ");
 
+  const originalInfo =
+    isEditing && editingAppt
+      ? `${String(editingAppt.date).split("-").reverse().join("/")} às ${editingAppt.time}`
+      : "";
+
   return (
     <div className="space-y-5 pb-28">
       <StepProgress current={2} onGo={() => goStep(2)} />
+
+      {/* aviso de edição com data/hora original */}
+      {isEditing && editingAppt && (
+        <div className="rounded-xl border p-3 bg-amber-50/40" style={{ borderColor: "#fde68a" }}>
+          <div className="text-sm">
+            <span className="font-medium">Editando agendamento</span> • originalmente marcado para{" "}
+            <b>{originalInfo}</b>.
+          </div>
+        </div>
+      )}
 
       {/* botão (i) no topo */}
       <div className="flex justify-end">
@@ -513,22 +593,20 @@ export default function Step2Schedule({
                   selDateObj.getMonth() === monthCursor.getMonth() &&
                   selDateObj.getDate() === n;
 
-                  const isDayOffFromMonth = dayOffSet.has(ymd);
-                  const past = isPastDay(d);
+                const isDayOffFromMonth = dayOffSet.has(ymd);
+                const past = isPastDay(d);
 
-                  // verifica se o dia da semana no defaultHoursByDay está desativado
-                  let isDefaultClosed = false;
-                  if (defaultHoursByDay && defaultHoursByDay.length === 7) {
-                    const idx = d.getDay(); // 0=Dom ... 6=Sáb
-                    isDefaultClosed = defaultHoursByDay[idx]?.enabled === false;
-                  }
+                // verifica se o dia da semana no defaultHoursByDay está desativado
+                let isDefaultClosed = false;
+                if (defaultHoursByDay && defaultHoursByDay.length === 7) {
+                  const idxDay = d.getDay(); // 0=Dom ... 6=Sáb
+                  isDefaultClosed = defaultHoursByDay[idxDay]?.enabled === false;
+                }
 
-                  const isAbsentException = exceptionsNorm.some(
-                    (e) => e.type === "DAY_OFF" && ymd === selectedDate
-                  );
+                // exceções do dia selecionado já vêm do endpoint do próprio dia
+                const isAbsentException = false;
 
-                  const isDayOff = past || isDayOffFromMonth || isDefaultClosed || isAbsentException;
-
+                const isDayOff = past || isDayOffFromMonth || isDefaultClosed || isAbsentException;
 
                 return (
                   <button
@@ -538,7 +616,7 @@ export default function Step2Schedule({
                     title={
                       past
                         ? "Dia no passado"
-                        : isDayOffFromMonth || isAbsentException
+                        : isDayOffFromMonth
                         ? "Dia indisponível (ausência)"
                         : ""
                     }
@@ -621,9 +699,9 @@ export default function Step2Schedule({
               onClick={() => setCancelOpen(true)}
               className="w-1/3 rounded-xl border py-3 font-medium bg-white hover:bg-gray-50"
               style={{ borderColor: "#e5e7eb", color: "#b91c1c" }}
-              title="Desistir deste agendamento"
+              title={isEditing ? "Cancelar edição" : "Desistir deste agendamento"}
             >
-              Desistir
+              {isEditing ? "Cancelar edição" : "Desistir"}
             </button>
 
             <button
@@ -644,7 +722,7 @@ export default function Step2Schedule({
               }`}
               style={{ borderColor: pickedTime && !saving ? "#bca49d" : "#e5e7eb", color: pickedTime && !saving ? "#9d8983" : undefined }}
             >
-              {saving ? "Salvando..." : "Avançar"}
+              {saving ? "Salvando..." : isEditing ? "Salvar alterações" : "Avançar"}
             </button>
           </div>
         </div>
@@ -655,10 +733,15 @@ export default function Step2Schedule({
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
           <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-lg mx-4">
-            <h3 className="font-semibold mb-3">Confirmar agendamento?</h3>
+            <h3 className="font-semibold mb-3">{isEditing ? "Confirmar alterações?" : "Confirmar agendamento?"}</h3>
             <div className="text-sm text-gray-700 space-y-1 mb-4">
-              <div><span className="font-medium">Data:</span> {selDateObj.toLocaleDateString("pt-BR")}</div>
-              <div><span className="font-medium">Horário:</span> {pickedTime}</div>
+              {isEditing && editingAppt && (
+                <div>
+                  <span className="font-medium">Antigo agendamento:</span>{" "}
+                  {String(editingAppt.date).split("-").reverse().join("/")} às {editingAppt.time}
+                </div>
+              )}
+              <div><span className="font-medium">Novo agendamento:</span> {selDateObj.toLocaleDateString("pt-BR")} às {pickedTime}</div>
               <div><span className="font-medium">Procedimentos:</span> {selectedProcedures.map((p) => p.name).join(", ")}</div>
               <div><span className="font-medium">Total:</span> {selectedSummary.priceTxt}</div>
             </div>
@@ -667,24 +750,24 @@ export default function Step2Schedule({
                 Revisar
               </button>
               <button onClick={handleSave} className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium" style={{ borderColor: "#bca49d", color: "#9d8983" }}>
-                Confirmar & agendar
+                {isEditing ? "Confirmar & salvar" : "Confirmar & agendar"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal "Desistir" (triste) */}
+      {/* Modal "Desistir" */}
       {cancelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCancelOpen(false)} />
           <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-lg mx-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl" aria-hidden>😔</span>
-              <h3 className="font-semibold">Desistir do agendamento?</h3>
+              <h3 className="font-semibold">{isEditing ? "Desistir da edição?" : "Desistir do agendamento?"}</h3>
             </div>
             <p className="text-sm text-gray-700 mb-4">
-              Tem certeza de que deseja desistir agora? Você pode voltar e agendar quando quiser.
+              Tem certeza de que deseja {isEditing ? "cancelar a edição agora" : "desistir agora"}? Você pode {isEditing ? "editar novamente" : "voltar e agendar"} quando quiser.
             </p>
             <div className="flex gap-3">
               <button
@@ -692,14 +775,14 @@ export default function Step2Schedule({
                 className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50"
                 style={{ borderColor: "#bca49d", color: "#9d8983" }}
               >
-                Continuar agendando
+                Continuar
               </button>
               <button
                 onClick={() => router.push(`/${tenantId}/home`)}
                 className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium"
                 style={{ borderColor: "#fde2e2", color: "#b91c1c" }}
               >
-                Sim, desistir
+                Sim, sair
               </button>
             </div>
           </div>

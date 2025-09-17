@@ -20,15 +20,11 @@ function statusColor(a: any) {
 }
 
 /** SKELETONS */
-function SkeletonTitle() {
-  return <div className="h-6 w-48 rounded bg-gray-200" />;
-}
+function SkeletonTitle() { return <div className="h-6 w-48 rounded bg-gray-200" />; }
 function SkeletonFilters() {
   return (
     <div className="grid grid-cols-2 gap-3">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-10 w-full rounded-lg bg-gray-100" />
-      ))}
+      {[...Array(4)].map((_, i) => <div key={i} className="h-10 w-full rounded-lg bg-gray-100" />)}
     </div>
   );
 }
@@ -112,15 +108,33 @@ export default function MeusAgendamentos() {
   const agendados = useMemo(() => filtered.filter((a) => !a.cancelado && !a.concluida), [filtered]);
   const finalizados = useMemo(() => filtered.filter((a) => a.cancelado || a.concluida), [filtered]);
 
+  // ===== REAGENDAR =====
+  function handleReschedule(ap: any) {
+    if (ap.cancelado || ap.concluida) return;
+    try {
+      // guardo o snapshot pro Step1/Step2 (fallback caso o usuário recarregue a página)
+      const payload = {
+        _id: ap._id,
+        date: ap.date,
+        time: ap.time,
+        // procedures no histórico têm { name, price, procedureId? }
+        procedures: Array.isArray(ap.procedures) ? ap.procedures.map((p: any) => ({
+          _id: String(p.procedureId || p._id || ""), // para casar com o catálogo
+          procedureId: String(p.procedureId || p._id || ""),
+          name: p.name,
+          price: Number(p.price || 0),
+        })) : (ap.procedure ? [{ _id: "", name: ap.procedure, price: Number(ap.valor_total || 0) }] : []),
+      };
+      sessionStorage.setItem("editAppointment", JSON.stringify(payload));
+    } catch {}
+    router.push(`/${tenantId}/novo-agendamento?edit=${encodeURIComponent(ap._id)}`);
+  }
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:py-8">
       {/* Título */}
       <div className="mb-4">
-        {loading ? (
-          <SkeletonTitle />
-        ) : (
-          <h1 className="text-xl font-semibold">Meus Agendamentos</h1>
-        )}
+        {loading ? <SkeletonTitle /> : <h1 className="text-xl font-semibold">Meus Agendamentos</h1>}
       </div>
 
       {/* Filtros */}
@@ -129,38 +143,15 @@ export default function MeusAgendamentos() {
           <SkeletonFilters />
         ) : (
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="border rounded-lg p-2 bg-white"
-            >
+            <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="border rounded-lg p-2 bg-white">
               <option value="">Todos status</option>
               <option value="agendado">Agendado</option>
               <option value="concluido">Concluído</option>
               <option value="cancelado">Cancelado</option>
             </select>
-
-            <input
-              type="text"
-              placeholder="Procedimento"
-              value={filtroProcedimento}
-              onChange={(e) => setFiltroProcedimento(e.target.value)}
-              className="border rounded-lg p-2"
-            />
-
-            <input
-              type="date"
-              value={filtroData}
-              onChange={(e) => setFiltroData(e.target.value)}
-              className="border rounded-lg p-2 col-span-1"
-            />
-
-            <input
-              type="time"
-              value={filtroHora}
-              onChange={(e) => setFiltroHora(e.target.value)}
-              className="border rounded-lg p-2 col-span-1"
-            />
+            <input type="text" placeholder="Procedimento" value={filtroProcedimento} onChange={(e) => setFiltroProcedimento(e.target.value)} className="border rounded-lg p-2" />
+            <input type="date" value={filtroData} onChange={(e) => setFiltroData(e.target.value)} className="border rounded-lg p-2 col-span-1" />
+            <input type="time" value={filtroHora} onChange={(e) => setFiltroHora(e.target.value)} className="border rounded-lg p-2 col-span-1" />
           </div>
         )}
       </div>
@@ -171,16 +162,14 @@ export default function MeusAgendamentos() {
 
         {loading ? (
           <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </>
         ) : agendados.length === 0 ? (
           <div className="text-gray-500 text-sm">Nenhum agendamento ativo.</div>
         ) : (
           agendados.map((ap: any) => (
             <div key={ap._id} className="rounded-lg border p-3 bg-white shadow-sm">
-              <div className="flex justify-between items-center gap-3">
+              <div className="flex justify-between items-start gap-3">
                 <div className="min-w-0">
                   <div className="font-medium">
                     {String(ap.date).split("-").reverse().join("/")} às {ap.time}
@@ -188,11 +177,22 @@ export default function MeusAgendamentos() {
                   <div className="text-xs text-gray-500 truncate">
                     {(ap.procedures || []).map((p: any) => p.name).join(", ") || ap.procedure}
                   </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Valor total: {BRL.format(Number(ap.valor_total || 0))}
+                  </div>
                 </div>
-                <div className={`text-sm font-medium shrink-0 ${statusColor(ap)}`}>{statusLabel(ap)}</div>
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                Valor total: {BRL.format(Number(ap.valor_total || 0))}
+                <div className="flex flex-col items-end gap-2">
+                  <div className={`text-sm font-medium ${statusColor(ap)}`}>{statusLabel(ap)}</div>
+                  <button
+                    type="button"
+                    onClick={() => handleReschedule(ap)}
+                    className="rounded-lg border px-3 py-1.5 text-sm bg-white hover:bg-gray-50"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                    title="Reagendar este horário"
+                  >
+                    Reagendar
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -205,9 +205,7 @@ export default function MeusAgendamentos() {
 
         {loading ? (
           <>
-            <SkeletonCard faded />
-            <SkeletonCard faded />
-            <SkeletonCard faded />
+            <SkeletonCard faded /><SkeletonCard faded /><SkeletonCard faded />
           </>
         ) : finalizados.length === 0 ? (
           <div className="text-gray-500 text-sm">Nenhum histórico.</div>
@@ -235,15 +233,12 @@ export default function MeusAgendamentos() {
 
       {/* Erro */}
       {!loading && error && (
-        <div
-          className="mt-6 rounded-xl border px-4 py-3 text-sm"
-          style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
-        >
+        <div className="mt-6 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}>
           {error}
         </div>
       )}
 
-      {/* Botão Voltar */}
+      {/* Voltar */}
       <div className="pt-4">
         <button
           onClick={() => router.push(`/${tenantId}/home`)}
@@ -254,10 +249,7 @@ export default function MeusAgendamentos() {
         </button>
       </div>
 
-      {/* Reforço contra overflow lateral em mobile */}
-      <style jsx global>{`
-        html, body { overflow-x: hidden; }
-      `}</style>
+      <style jsx global>{` html, body { overflow-x: hidden; } `}</style>
     </div>
   );
 }
