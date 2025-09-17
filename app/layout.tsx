@@ -1,5 +1,5 @@
-// app/layout.tsx
 import "./globals.css";
+
 export const metadata = {
   title: "Portal do Cliente • Estety Cloud",
   description: "Acesso do cliente aos agendamentos",
@@ -8,9 +8,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>
-        {children}
-      </body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
