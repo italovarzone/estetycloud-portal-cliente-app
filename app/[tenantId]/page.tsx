@@ -4,7 +4,7 @@ import TenantBoot from "./TenantBoot";
 export const revalidate = 60;
 
 async function getCms(tenantId: string) {
-  const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/cms/${tenantId}`, { next: { revalidate: 60 } });
+  const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/cms/${tenantId}`, { cache: "no-store" });
   return r.json();
 }
 

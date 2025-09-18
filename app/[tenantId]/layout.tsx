@@ -1,10 +1,6 @@
-import Link from "next/link";
-import TenantBoot from "./TenantBoot";
-
 export default function Layout({
   children,
-  params: { tenantId },
-}: { children: React.ReactNode; params: { tenantId: string } }) {
+}: { children: React.ReactNode; }) {
   return (
     <html lang="pt-br">
       <body className="min-h-screen bg-[#f8f9fa] text-[#1D1411]">

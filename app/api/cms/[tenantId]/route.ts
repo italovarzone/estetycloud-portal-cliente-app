@@ -4,6 +4,10 @@ const OWNER = process.env.CMS_GH_OWNER!;      // ex.: "seu-usuario-ou-org"
 const REPO  = process.env.CMS_GH_REPO!;       // ex.: "estetycloud-cms"
 const REF   = process.env.CMS_GH_REF ?? "main";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
 // CDN gratuito do jsDelivr para arquivos do GitHub
 const BASE = `https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${REF}/tenants`;
 
