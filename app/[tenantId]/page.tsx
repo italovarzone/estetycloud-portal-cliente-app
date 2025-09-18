@@ -1,22 +1,22 @@
 import LandingClient from "./LandingClient";
 import TenantBoot from "./TenantBoot";
 
-export const revalidate = 60; // ok manter
+export const dynamic = "force-dynamic";   // garante render dinâmico em prod
+export const revalidate = 0;              // sem SSG para esta página
 
 async function getCms(tenantId: string) {
   try {
-    // IMPORTANTE: URL RELATIVA no Server Component
+    // IMPORTANTE: URL RELATIVA e sem cache estático
     const r = await fetch(`/api/cms/${tenantId}`, { cache: "no-store" });
     if (!r.ok) throw new Error(`CMS ${r.status}`);
-    const json = await r.json();
-    return json;
+    return await r.json();
   } catch (e) {
-    // nunca deixe o server crashar — devolva um “esqueleto”
+    // fallback que não quebra a página
     return {
       ok: false,
       _error: String(e),
       branding: { name: "Estety Cloud", primaryColor: "#bca49d" },
-      hero: { title: "Conteúdo indisponível por enquanto", subtitle: "", cover: "" },
+      hero: { title: "Conteúdo indisponível no momento", subtitle: "", cover: "" },
       services: [],
       gallery: [],
       about: {},

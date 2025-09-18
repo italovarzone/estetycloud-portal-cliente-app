@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";         // garante execução em Node (não Edge)
-export const dynamic = "force-dynamic";  // não congele resposta
-export const revalidate = 60;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 60; // ok ter cache de 60s só para o JSON
+
 
 const OWNER = process.env.CMS_GH_OWNER!;
 const REPO  = process.env.CMS_GH_REPO!;
