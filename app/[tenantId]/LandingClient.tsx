@@ -51,6 +51,12 @@ export default function LandingClient({
     el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
+  useEffect(() => { console.log("CMS DATA", data); }, [data]);
+
+  if (!data?.hero?.title && !data?.services?.length && !data?.gallery?.length) {
+    return <div className="p-6">Conteúdo não carregado (ver console)</div>;
+  }
+
   return (
     <>
       {/* NAVBAR */}

@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
-
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 60; // ok ter cache de 60s só para o JSON
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
+import { NextResponse } from "next/server";
 
 const OWNER = process.env.CMS_GH_OWNER!;
 const REPO  = process.env.CMS_GH_REPO!;
