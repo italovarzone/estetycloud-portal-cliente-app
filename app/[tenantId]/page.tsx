@@ -1,17 +1,17 @@
 import LandingClient from "./LandingClient";
 import TenantBoot from "./TenantBoot";
+import { unstable_noStore as noStore } from "next/cache";
 
-export const dynamic = "force-dynamic";   // garante render dinâmico em prod
-export const revalidate = 0;              // sem SSG para esta página
+export const dynamic = "force-dynamic"; // impede SSG
+export const revalidate = 0;            // nada de HTML estático
 
 async function getCms(tenantId: string) {
+  noStore(); // garante que este request não usa cache
   try {
-    // IMPORTANTE: URL RELATIVA e sem cache estático
     const r = await fetch(`/api/cms/${tenantId}`, { cache: "no-store" });
     if (!r.ok) throw new Error(`CMS ${r.status}`);
     return await r.json();
   } catch (e) {
-    // fallback que não quebra a página
     return {
       ok: false,
       _error: String(e),
