@@ -1,3 +1,7 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
 import "./globals.css";
 
 export const metadata = {
