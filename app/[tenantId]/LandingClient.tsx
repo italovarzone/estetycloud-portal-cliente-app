@@ -295,22 +295,6 @@ export default function LandingClient({
       <footer className="mt-12 md:mt-16 border-t bg-white">
         <div className="max-w-7xl mx-auto px-4 py-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center gap-2">
-              <img src="/assets/images/logo_fundo_transp.png" alt="" className="h-8 w-8" />
-              <span className="text-lg font-medium">{data?.branding?.name || "Estety Cloud"}</span>
-            </div>
-            <p className="text-sm opacity-75 mt-2">
-              Beleza com técnica e segurança. Agende seu horário.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-2">Atendimento</h4>
-            <ul className="text-sm opacity-80 space-y-1">
-              <li>Seg–Sex: 9h–19h</li>
-              <li>Sáb: 9h–14h</li>
-            </ul>
-          </div>
-          <div>
             <h4 className="font-semibold mb-2">Contato</h4>
             <ul className="text-sm opacity-80 space-y-1">
               {data?.contact?.whatsapp && (
@@ -327,18 +311,7 @@ export default function LandingClient({
                   </a>
                 </li>
               )}
-              {data?.contact?.address && <li>{data.contact.address}</li>}
             </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-2">Agendamentos</h4>
-            <Link
-              href={`/${tenantId}/home`}
-              className="inline-block px-4 py-2 rounded-xl border"
-              style={{ borderColor: brandColor }}
-            >
-              Agende Agora
-            </Link>
           </div>
         </div>
         <div className="border-t py-4 text-center text-xs opacity-70">
