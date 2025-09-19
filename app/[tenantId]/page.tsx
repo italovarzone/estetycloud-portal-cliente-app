@@ -21,12 +21,33 @@
     return `${proto}://${host}`;
   }
 
-  async function getCms(tenantId: string) {
-    noStore();
-    const base = absoluteBaseUrl();              // <<< constrói base absoluta
-    const r = await fetch(`${base}/api/cms/${tenantId}`, { cache: "no-store" });
-    if (!r.ok) throw new Error(`CMS ${r.status}`);
-    return r.json();
+  // valores padrão caso o CMS não responda
+  const FALLBACK = {
+    brand: {
+      name: "Estety Cloud",
+      logo: "/assets/images/logo_fundo_transp.png",
+      primary: "#9d8983",
+      accent: "#bca49d",
+    },
+    hero: {
+      title: "Estety Cloud",
+      subtitle: "Portal do Cliente",
+    },
+  };
+
+  export async function getCms(tenantId: string) {
+    noStore(); // garante que nunca cacheie
+    try {
+      const base = absoluteBaseUrl();
+      const r = await fetch(`${base}/api/cms/${tenantId}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`CMS ${r.status}`);
+
+      const json = await r.json();
+      return { ...FALLBACK, ...json }; // mescla defaults + CMS
+    } catch (err) {
+      console.error("[getCms] erro CMS:", err);
+      return FALLBACK; // devolve defaults em vez de quebrar
+    }
   }
 
   export default async function TenantLanding({ params: { tenantId } }: { params: { tenantId: string } }) {
