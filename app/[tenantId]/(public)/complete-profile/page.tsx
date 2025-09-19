@@ -1,67 +1,108 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
+
+// helpers (iguais aos do registro/perfil)
+function onlyDigits(s: string) {
+  return String(s || "").replace(/\D+/g, "");
+}
+function maskPhone(raw: string) {
+  const d = onlyDigits(raw).slice(0, 11);
+  if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").trim();
+  return d.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").trim();
+}
+function isValidBirthBR(v?: string) {
+  if (!v) return true; // opcional
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return false;
+  const [dd, mm, yyyy] = v.split("/").map(Number);
+  const dt = new Date(yyyy, mm - 1, dd);
+  return dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd;
+}
 
 export default function CompleteProfilePage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [birthdate, setBirthdate] = useState("");     // DD/MM/AAAA
+  const [phone, setPhone] = useState("");             // guardamos dígitos; máscara vem do useMemo
+  const phoneMasked = useMemo(() => maskPhone(phone), [phone]);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // 1) Ao montar, verifica se o perfil já está completo; se sim, vai pra home
-useEffect(() => {
-  (async () => {
-    try {
-      const token = localStorage.getItem("clientPortalToken");
-      if (!token) throw new Error("Sessão expirada.");
+  // 1) Verifica status e pré-preenche
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = localStorage.getItem("clientPortalToken");
+        if (!token) throw new Error("Sessão expirada.");
 
-      // 🔑 repare que a URL não usa tenantId na path
-      const r = await fetch(`${API}/api/client-portal/profile/status`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "x-tenant-id": String(tenantId || ""), // aqui sim
-        },
-        cache: "no-store",
-      });
+        // status: decide se precisa completar
+        const r = await fetch(`${API}/api/client-portal/profile/status`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "x-tenant-id": String(tenantId || ""),
+          },
+          cache: "no-store",
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data?.error || "Falha ao consultar perfil.");
 
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data?.error || "Falha ao consultar perfil.");
+        if (data.needsProfile === false) {
+          router.replace(`/${tenantId}/home`);
+          return;
+        }
 
-      // se já estiver completo, sai da página
-      if (data.needsProfile === false) {
-        router.replace(`/${tenantId}/home`); // aqui sim precisa do tenantId
-        return;
+        // pré-preenche (se backend retornar)
+        if (data?.profile?.name) setName(String(data.profile.name));
+        if (data?.profile?.phone) setPhone(onlyDigits(String(data.profile.phone)));
+
+        // se você quiser pré-preencher birthdate, pode buscar /me aqui:
+        // const me = await fetch(`${API}/api/client-portal/me`, { headers: { Authorization: `Bearer ${token}`, "x-tenant-id": String(tenantId || "") }});
+        // ... converter YYYY-MM-DD -> DD/MM/AAAA
+      } catch (e: any) {
+        console.warn("[complete-profile] status check:", e?.message);
+      } finally {
+        setChecking(false);
       }
+    })();
+  }, [tenantId, router]);
 
-      // pré-preenche se tivermos nome/telefone
-      if (data?.profile) {
-        if (data.profile.name) setName(String(data.profile.name));
-        if (data.profile.phone) setPhone(String(data.profile.phone));
-      }
-    } catch (e: any) {
-      console.warn("[complete-profile] status check:", e?.message);
-    } finally {
-      setChecking(false);
-    }
-  })();
-}, [tenantId, router]);
-
+  // 2) Submit
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // validações (iguais às do registro)
+    if (!String(name).trim()) {
+      setError("Informe seu nome.");
+      return;
+    }
+    if (!isValidBirthBR(birthdate)) {
+      setError("Data de nascimento inválida (use DD/MM/AAAA).");
+      return;
+    }
+    if (onlyDigits(phone).length < 10) {
+      setError("Informe um WhatsApp válido (com DDD).");
+      return;
+    }
 
     try {
       setLoading(true);
       const token = localStorage.getItem("clientPortalToken");
       if (!token) throw new Error("Sessão expirada.");
+
+      const body = {
+        name: String(name).trim(),
+        phone: phoneMasked,          // enviamos já mascarado (o backend grava e também salva phoneDigits)
+        birthdate: birthdate || "",  // DD/MM/AAAA (backend converte para YYYY-MM-DD)
+      };
 
       const r = await fetch(`${API}/api/client-portal/profile/complete`, {
         method: "POST",
@@ -70,13 +111,12 @@ useEffect(() => {
           Authorization: `Bearer ${token}`,
           "x-tenant-id": String(tenantId || ""),
         },
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
+        body: JSON.stringify(body),
       });
 
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Falha ao completar perfil.");
 
-      // perfil completo -> segue pra home
       router.replace(`/${tenantId}/home`);
     } catch (e: any) {
       setError(e.message || "Erro inesperado.");
@@ -115,27 +155,53 @@ useEffect(() => {
           <h2 className="text-base font-medium mb-4 text-center">Complete seu perfil para continuar</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Nome completo (igual ao registro) */}
             <div>
               <label className="block text-sm mb-1">Nome completo</label>
               <input
-                type="text"
-                className="w-full rounded-lg border p-3 outline-none"
-                style={{ borderColor: "#e5e7eb" }}
+                className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                onFocus={(e)=> (e.currentTarget.style.borderColor = "#bca49d")}
+                onBlur={(e)=> (e.currentTarget.style.borderColor = "#e5e7eb")}
+                placeholder="Seu nome"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                onChange={(e)=> setName(e.target.value)}
               />
             </div>
+
+            {/* Data de nascimento (igual ao registro) */}
             <div>
-              <label className="block text-sm mb-1">Telefone</label>
+              <label className="block text-sm mb-1">Data de nascimento</label>
               <input
-                type="tel"
-                placeholder="(99) 99999-9999"
-                className="w-full rounded-lg border p-3 outline-none"
-                style={{ borderColor: "#e5e7eb" }}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
+                inputMode="numeric"
+                maxLength={10}
+                className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                onFocus={(e)=> (e.currentTarget.style.borderColor = "#bca49d")}
+                onBlur={(e)=> (e.currentTarget.style.borderColor = "#e5e7eb")}
+                placeholder="DD/MM/AAAA"
+                value={birthdate}
+                onChange={(e) => {
+                  let v = e.target.value.replace(/\D+/g, "").slice(0, 8);
+                  if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1/$2/$3");
+                  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, "$1/$2");
+                  setBirthdate(v);
+                }}
+              />
+            </div>
+
+            {/* WhatsApp (igual ao registro) */}
+            <div>
+              <label className="block text-sm mb-1">WhatsApp</label>
+              <input
+                inputMode="tel"
+                className="w-full rounded-lg border px-3 py-3 outline-none transition focus:ring-2"
+                style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                onFocus={(e)=> (e.currentTarget.style.borderColor = "#bca49d")}
+                onBlur={(e)=> (e.currentTarget.style.borderColor = "#e5e7eb")}
+                placeholder="(11) 98888-7777"
+                value={phoneMasked}
+                onChange={(e)=> setPhone(onlyDigits(e.target.value))}
               />
             </div>
 
