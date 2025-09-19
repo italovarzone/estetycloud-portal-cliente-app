@@ -154,11 +154,6 @@ export default function LandingClient({
                 <div className="p-4">
                   <h3 className="font-medium text-lg">{s.title}</h3>
                   {s.desc && <p className="text-sm opacity-80 mt-1">{s.desc}</p>}
-                  {s.price && (
-                    <div className="mt-3 font-semibold" style={{ color: brandColor }}>
-                      {s.price}
-                    </div>
-                  )}
                 </div>
               </article>
             ))}
