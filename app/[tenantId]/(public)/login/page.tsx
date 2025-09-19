@@ -82,6 +82,13 @@ async function onGoogleCredential(credential: string) {
     const data = await r.json();
     if (!r.ok) throw new Error(data?.error || "Falha no login com Google.");
 
+    if (data.preToken) {
+      // primeira vez neste tenant -> guarda preToken e leva para complete-profile
+      sessionStorage.setItem("clientPortalPreToken", data.preToken);
+      router.replace(`/${tenantId}/complete-profile`);
+      return;
+    }
+
     localStorage.setItem("clientPortalToken", data.token);
     localStorage.setItem("clientPortalTenant", String(tenantId));
 

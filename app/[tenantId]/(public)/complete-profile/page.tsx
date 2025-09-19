@@ -6,7 +6,7 @@ import Image from "next/image";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
 
-// helpers (iguais aos do registro/perfil)
+// helpers
 function onlyDigits(s: string) {
   return String(s || "").replace(/\D+/g, "");
 }
@@ -29,43 +29,50 @@ export default function CompleteProfilePage() {
 
   const [name, setName] = useState("");
   const [birthdate, setBirthdate] = useState("");     // DD/MM/AAAA
-  const [phone, setPhone] = useState("");             // guardamos dígitos; máscara vem do useMemo
+  const [phone, setPhone] = useState("");             // guardamos dígitos
   const phoneMasked = useMemo(() => maskPhone(phone), [phone]);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // 1) Verifica status e pré-preenche
+  // ===== MOUNT: decide o modo (Bearer vs preToken) e pré-preenche =====
   useEffect(() => {
+    const bearer = typeof window !== "undefined" ? localStorage.getItem("clientPortalToken") : null;
+    const preToken = typeof window !== "undefined" ? sessionStorage.getItem("clientPortalPreToken") : null;
+
+    // pré-preenche nome (opcional) vindo do login/google
+    const preName = typeof window !== "undefined" ? sessionStorage.getItem("clientPortalPreName") : null;
+    if (preName) setName(preName);
+
+    // se tiver Bearer, consulta status; se só tiver preToken, já libera o form
     (async () => {
       try {
-        const token = localStorage.getItem("clientPortalToken");
-        if (!token) throw new Error("Sessão expirada.");
+        if (bearer) {
+          const r = await fetch(`${API}/api/client-portal/profile/status`, {
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              "x-tenant-id": String(tenantId || ""),
+            },
+            cache: "no-store",
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data?.error || "Falha ao consultar perfil.");
 
-        // status: decide se precisa completar
-        const r = await fetch(`${API}/api/client-portal/profile/status`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "x-tenant-id": String(tenantId || ""),
-          },
-          cache: "no-store",
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data?.error || "Falha ao consultar perfil.");
-
-        if (data.needsProfile === false) {
-          router.replace(`/${tenantId}/home`);
+          if (data.needsProfile === false) {
+            router.replace(`/${tenantId}/home`);
+            return;
+          }
+          if (data?.profile?.name) setName(String(data.profile.name));
+          if (data?.profile?.phone) setPhone(onlyDigits(String(data.profile.phone)));
+        } else if (preToken) {
+          // cliente ainda não existe — nada de chamada /status
+          // (opcional) se houver phone/name guardados do passo anterior, já estão setados
+        } else {
+          // sem Bearer e sem preToken -> sessão inválida
+          router.replace(`/${tenantId}/login`);
           return;
         }
-
-        // pré-preenche (se backend retornar)
-        if (data?.profile?.name) setName(String(data.profile.name));
-        if (data?.profile?.phone) setPhone(onlyDigits(String(data.profile.phone)));
-
-        // se você quiser pré-preencher birthdate, pode buscar /me aqui:
-        // const me = await fetch(`${API}/api/client-portal/me`, { headers: { Authorization: `Bearer ${token}`, "x-tenant-id": String(tenantId || "") }});
-        // ... converter YYYY-MM-DD -> DD/MM/AAAA
       } catch (e: any) {
         console.warn("[complete-profile] status check:", e?.message);
       } finally {
@@ -74,12 +81,12 @@ export default function CompleteProfilePage() {
     })();
   }, [tenantId, router]);
 
-  // 2) Submit
+  // ===== SUBMIT =====
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    // validações (iguais às do registro)
+    // validações
     if (!String(name).trim()) {
       setError("Informe seu nome.");
       return;
@@ -95,27 +102,46 @@ export default function CompleteProfilePage() {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("clientPortalToken");
-      if (!token) throw new Error("Sessão expirada.");
 
-      const body = {
-        name: String(name).trim(),
-        phone: phoneMasked,          // enviamos já mascarado (o backend grava e também salva phoneDigits)
-        birthdate: birthdate || "",  // DD/MM/AAAA (backend converte para YYYY-MM-DD)
+      const bearer = localStorage.getItem("clientPortalToken");
+      const preToken = sessionStorage.getItem("clientPortalPreToken");
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "x-tenant-id": String(tenantId || ""),
       };
+
+      const body: any = {
+        name: String(name).trim(),
+        phone: phoneMasked,         // backend salva phone e phoneDigits
+        birthdate: birthdate || "", // DD/MM/AAAA
+      };
+
+      if (bearer) {
+        headers.Authorization = `Bearer ${bearer}`;
+      } else if (preToken) {
+        // fluxo "novo cliente" — ainda não existe no banco deste tenant
+        body.preToken = preToken;
+      } else {
+        setError("Sessão expirada. Faça login novamente.");
+        return;
+      }
 
       const r = await fetch(`${API}/api/client-portal/profile/complete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "x-tenant-id": String(tenantId || ""),
-        },
+        headers,
         body: JSON.stringify(body),
       });
-
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Falha ao completar perfil.");
+
+      // se vier token novo (caso preToken), persiste e limpa os itens de sessão
+      if (data.token) {
+        localStorage.setItem("clientPortalToken", data.token);
+        localStorage.setItem("clientPortalTenant", String(tenantId));
+        sessionStorage.removeItem("clientPortalPreToken");
+        sessionStorage.removeItem("clientPortalPreName");
+      }
 
       router.replace(`/${tenantId}/home`);
     } catch (e: any) {
@@ -169,7 +195,7 @@ export default function CompleteProfilePage() {
               />
             </div>
 
-            {/* Data de nascimento (igual ao registro) */}
+            {/* Data de nascimento */}
             <div>
               <label className="block text-sm mb-1">Data de nascimento</label>
               <input
@@ -190,7 +216,7 @@ export default function CompleteProfilePage() {
               />
             </div>
 
-            {/* WhatsApp (igual ao registro) */}
+            {/* WhatsApp */}
             <div>
               <label className="block text-sm mb-1">WhatsApp</label>
               <input
