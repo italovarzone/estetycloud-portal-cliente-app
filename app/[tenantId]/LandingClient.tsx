@@ -269,13 +269,6 @@ export default function LandingClient({
             {data?.about?.text && (
               <p className="opacity-90 whitespace-pre-line leading-relaxed">{data.about.text}</p>
             )}
-            <Link
-              href={`/${tenantId}/home`}
-              className="inline-block mt-6 px-5 py-3 rounded-2xl text-white font-medium shadow"
-              style={{ background: brandColor }}
-            >
-              Agende Agora
-            </Link>
           </div>
         </section>
       )}
