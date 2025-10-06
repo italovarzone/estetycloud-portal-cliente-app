@@ -10,10 +10,9 @@ type Cms = {
   gallery?: { image: string; caption?: string }[];
   about?: { title?: string; text?: string; photo?: string };
   contact?: { instagram?: string; whatsapp?: string; address?: string };
-  testimonials?: { name: string; text: string; photo?: string }[]; // novo
-  faq?: { question: string; answer: string }[];                    // novo
+  testimonials?: { name: string; text: string; photo?: string }[];
+  faq?: { question: string; answer: string }[];
 };
-
 
 export default function LandingClient({
   tenantId,
@@ -23,9 +22,8 @@ export default function LandingClient({
   data: Cms;
 }) {
   const brandColor = data?.branding?.primaryColor || "#bca49d";
-
-  // navbar shrink on scroll
   const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
@@ -33,7 +31,6 @@ export default function LandingClient({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // lightbox
   const [lightbox, setLightbox] = useState<{ src: string; caption?: string } | null>(null);
   const closeLightbox = useCallback(() => setLightbox(null), []);
   useEffect(() => {
@@ -42,7 +39,6 @@ export default function LandingClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [closeLightbox]);
 
-  // carousel
   const sliderRef = useRef<HTMLDivElement>(null);
   const slideBy = (dir: "left" | "right") => {
     const el = sliderRef.current;
@@ -50,8 +46,6 @@ export default function LandingClient({
     const amount = el.clientWidth * 0.9;
     el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
-
-  useEffect(() => { console.log("CMS DATA", data); }, [data]);
 
   if (!data?.hero?.title && !data?.services?.length && !data?.gallery?.length) {
     return <div className="p-6">Conteúdo não carregado (ver console)</div>;
@@ -61,99 +55,81 @@ export default function LandingClient({
     <>
       {/* NAVBAR */}
       <nav
-        className={`sticky top-0 z-50 transition-all ${scrolled ? "bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm" : "bg-transparent"}`}
+        className={`sticky top-0 z-50 transition-all duration-500 ${
+          scrolled
+            ? "bg-white/90 backdrop-blur-md shadow-md"
+            : "bg-transparent"
+        }`}
       >
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between transition-all">
           <div className="flex items-center gap-3">
-            <img src="/assets/images/logo_fundo_transp.png" alt="" className="h-9 w-9" />
-            <span className="text-lg md:text-xl font-medium">
-              {data?.branding?.name || "Estety Cloud"}
-            </span>
+            <img src="/assets/images/logo_fundo_transp.png" alt="" className="h-9 w-9 animate-fadeIn" />
+            <span className="text-xl font-semibold tracking-wide">{data?.branding?.name || "Estety Cloud"}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/${tenantId}/home`}
-              className="px-4 py-2 rounded-xl border"
-              style={{ borderColor: brandColor }}
-            >
-              Agende Agora
-            </Link>
-          </div>
+          <Link
+            href={`/${tenantId}/home`}
+            className="px-5 py-2 rounded-xl border-2 text-sm font-medium hover:scale-105 transition-transform"
+            style={{ borderColor: brandColor, color: brandColor }}
+          >
+            Agende Agora
+          </Link>
         </div>
       </nav>
 
       {/* HERO */}
-      <header className="relative">
+      <header className="relative overflow-hidden">
         {data?.hero?.cover && (
           <img
             src={data.hero.cover}
             alt=""
-            className="w-full h-[60vh] md:h-[72vh] object-cover"
+            className="w-full h-[75vh] object-cover animate-fadeIn"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0">
-          <div className="max-w-7xl mx-auto px-4 py-10 md:py-16">
-            <h1 className="text-3xl md:text-6xl font-semibold text-white drop-shadow">
-              {data?.hero?.title}
-            </h1>
-            {data?.hero?.subtitle && (
-              <p className="mt-3 md:mt-4 text-lg md:text-2xl text-white/90">
-                {data.hero.subtitle}
-              </p>
-            )}
-            <div className="mt-6">
-              <Link
-                href={`/${tenantId}/home`}
-                className="inline-block px-6 py-3 rounded-2xl text-white font-medium shadow-lg"
-                style={{ background: brandColor }}
-              >
-                Agende Agora
-              </Link>
-            </div>
-          </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white px-6">
+          <h1 className="text-4xl md:text-6xl font-bold drop-shadow-lg animate-slideDown">
+            {data?.hero?.title}
+          </h1>
+          {data?.hero?.subtitle && (
+            <p className="mt-3 md:mt-4 text-lg md:text-2xl text-white/90 animate-fadeIn delay-200">
+              {data.hero.subtitle}
+            </p>
+          )}
+          <Link
+            href={`/${tenantId}/home`}
+            className="mt-8 inline-block px-8 py-3 rounded-full text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all"
+            style={{ background: brandColor }}
+          >
+            Agende Agora
+          </Link>
         </div>
       </header>
 
       {/* SERVIÇOS */}
       {!!data?.services?.length && (
-        <section className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-          <div className="flex items-end justify-between gap-4 mb-6">
-            <h2 className="text-2xl md:text-3xl font-semibold">Serviços</h2>
-            <Link
-              href={`/${tenantId}/home`}
-              className="hidden sm:inline-flex px-4 py-2 rounded-xl text-sm"
-              style={{ border: `1px solid ${brandColor}` }}
-            >
-              Ver horários
-            </Link>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section className="max-w-7xl mx-auto px-4 py-20">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 animate-fadeIn">
+            Nossos Serviços
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {data.services!.map((s, i) => (
               <article
                 key={i}
-                className="group bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-md transition"
+                className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl overflow-hidden transition-all transform hover:-translate-y-1"
               >
                 {s.image && (
-                  <button
-                    type="button"
-                    onClick={() => s.image && setLightbox({ src: s.image, caption: s.title })}
-                    className="block w-full"
-                    aria-label={`Abrir imagem de ${s.title}`}
-                  >
-                    <img
-                      src={s.image}
-                      alt=""
-                      className="w-full h-44 md:h-52 object-cover group-hover:scale-[1.02] transition"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </button>
+                  <img
+                    src={s.image}
+                    alt={s.title}
+                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
                 )}
-                <div className="p-4">
-                  <h3 className="font-medium text-lg">{s.title}</h3>
-                  {s.desc && <p className="text-sm opacity-80 mt-1">{s.desc}</p>}
+                <div className="p-6">
+                  <h3 className="font-semibold text-lg mb-2">{s.title}</h3>
+                  {s.desc && <p className="text-sm text-gray-600">{s.desc}</p>}
+                  {s.price && (
+                    <p className="mt-3 font-semibold text-brand">{s.price}</p>
+                  )}
                 </div>
               </article>
             ))}
@@ -161,78 +137,36 @@ export default function LandingClient({
         </section>
       )}
 
-      {/* RESULTADOS (CARROSSEL) */}
+      {/* GALERIA */}
       {!!data?.gallery?.length && (
-        <section className="bg-white border-y">
-          <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl md:text-3xl font-semibold">Resultados</h2>
+        <section className="bg-gradient-to-b from-white to-gray-50 py-20">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold">Resultados</h2>
               <div className="hidden sm:flex gap-2">
-                <button
-                  onClick={() => slideBy("left")}
-                  className="h-10 w-10 rounded-full border hover:bg-gray-50"
-                  aria-label="Anterior"
-                >
-                  ‹
-                </button>
-                <button
-                  onClick={() => slideBy("right")}
-                  className="h-10 w-10 rounded-full border hover:bg-gray-50"
-                  aria-label="Próximo"
-                >
-                  ›
-                </button>
+                <button onClick={() => slideBy("left")} className="btn border p-2 rounded-full hover:bg-gray-100">‹</button>
+                <button onClick={() => slideBy("right")} className="btn border p-2 rounded-full hover:bg-gray-100">›</button>
               </div>
             </div>
-
-            <div className="relative">
-              {/* buttons mobile */}
-              <div className="sm:hidden absolute inset-y-0 left-0 right-0 flex items-center justify-between pointer-events-none">
-                <button
-                  onClick={() => slideBy("left")}
-                  className="pointer-events-auto h-9 w-9 rounded-full bg-white/90 border"
-                  aria-label="Anterior"
+            <div ref={sliderRef} className="flex gap-6 overflow-x-auto scroll-smooth pb-4">
+              {data.gallery!.map((g, i) => (
+                <figure
+                  key={i}
+                  className="flex flex-col min-w-[82%] sm:min-w-[46%] lg:min-w-[31%] rounded-2xl bg-white shadow-md overflow-hidden transition-transform hover:-translate-y-1"
                 >
-                  ‹
-                </button>
-                <button
-                  onClick={() => slideBy("right")}
-                  className="pointer-events-auto h-9 w-9 rounded-full bg-white/90 border"
-                  aria-label="Próximo"
-                >
-                  ›
-                </button>
-              </div>
-
-              <div
-                ref={sliderRef}
-                className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
-              >
-                {data.gallery!.map((g, i) => (
-                  <figure
-                    key={i}
-                    className="min-w-[82%] sm:min-w-[46%] lg:min-w-[31%] snap-start rounded-xl overflow-hidden border bg-white"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setLightbox({ src: g.image, caption: g.caption })}
-                      className="block w-full"
-                      aria-label="Abrir imagem grande"
-                    >
-                      <img
-                        src={g.image}
-                        alt={g.caption || ""}
-                        className="w-full h-64 md:h-72 object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </button>
-                    {g.caption && (
-                      <figcaption className="p-3 text-sm opacity-80">{g.caption}</figcaption>
-                    )}
-                  </figure>
-                ))}
-              </div>
+                  <img
+                    src={g.image}
+                    alt={g.caption || ""}
+                    className="w-full h-64 object-cover cursor-pointer hover:scale-105 transition-transform duration-500"
+                    onClick={() => setLightbox({ src: g.image, caption: g.caption })}
+                  />
+                  {g.caption && (
+                    <figcaption className="p-4 text-sm text-gray-600 text-center border-t bg-gray-50">
+                      {g.caption}
+                    </figcaption>
+                  )}
+                </figure>
+              ))}
             </div>
           </div>
         </section>
@@ -240,103 +174,71 @@ export default function LandingClient({
 
       {/* SOBRE */}
       {(data?.about?.photo || data?.about?.text) && (
-        <section className="max-w-7xl mx-auto px-4 py-12 md:py-16 grid md:grid-cols-2 gap-8 items-center">
-          {data?.about?.photo && (
-            <button
-              type="button"
-              onClick={() => setLightbox({ src: data.about!.photo!, caption: data.about?.title })}
-              className="block w-full"
-              aria-label="Abrir foto maior"
-            >
-              <img
-                src={data.about.photo}
-                alt=""
-                className="w-full h-[320px] md:h-[440px] rounded-2xl border object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            </button>
-          )}
-          <div>
-            <h2 className="text-2xl md:text-3xl font-semibold mb-3">
-              {data?.about?.title || "Sobre"}
-            </h2>
-            {data?.about?.text && (
-              <p className="opacity-90 whitespace-pre-line leading-relaxed">{data.about.text}</p>
-            )}
+        <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
+          <div className="animate-slideLeft">
+            <img
+              src={data.about?.photo}
+              alt="Sobre"
+              className="w-full rounded-3xl shadow-xl object-cover"
+            />
+          </div>
+          <div className="animate-slideRight">
+            <h2 className="text-3xl font-bold mb-4">{data.about?.title || "Sobre Nós"}</h2>
+            <p className="text-gray-700 leading-relaxed">{data.about?.text}</p>
           </div>
         </section>
       )}
 
-      {/* CTA FIXA (mobile) */}
-      <div className="md:hidden sticky bottom-3 z-40 flex justify-center px-3">
-        <Link
-          href={`/${tenantId}/home`}
-          className="w-full max-w-md text-center px-5 py-3 rounded-2xl text-white font-medium shadow-lg"
-          style={{ background: brandColor }}
-        >
-          Ver horários e agendar
-        </Link>
-      </div>
-
       {/* FOOTER */}
-      <footer className="mt-12 md:mt-16 border-t bg-white">
-        <div className="max-w-7xl mx-auto px-4 py-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <footer className="bg-[#1D1411] text-white mt-20">
+        <div className="max-w-7xl mx-auto px-4 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <h4 className="font-semibold mb-2">Contato</h4>
-            <ul className="text-sm opacity-80 space-y-1">
+            <h4 className="font-semibold mb-3 text-lg">Contato</h4>
+            <ul className="space-y-1 text-sm text-gray-300">
               {data?.contact?.whatsapp && (
-                <li>
-                  <a className="hover:opacity-100" href={`https://wa.me/${data.contact.whatsapp}`} target="_blank">
-                    WhatsApp
-                  </a>
-                </li>
+                <li><a href={`https://wa.me/${data.contact.whatsapp}`} target="_blank">WhatsApp</a></li>
               )}
               {data?.contact?.instagram && (
-                <li>
-                  <a className="hover:opacity-100" href={`https://instagram.com/${data.contact.instagram}`} target="_blank">
-                    Instagram
-                  </a>
-                </li>
+                <li><a href={`https://instagram.com/${data.contact.instagram}`} target="_blank">Instagram</a></li>
               )}
             </ul>
           </div>
         </div>
-        <div className="border-t py-4 text-center text-xs opacity-70">
-          © {new Date().getFullYear()} {data?.branding?.name || "Estety Cloud"} • Todos os direitos reservados
+        <div className="text-center text-xs opacity-70 py-4 border-t border-white/10">
+          © {new Date().getFullYear()} {data?.branding?.name || "Estety Cloud"} — Todos os direitos reservados
         </div>
       </footer>
 
       {/* LIGHTBOX */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[100] animate-fadeIn p-4"
           onClick={closeLightbox}
-          role="dialog"
-          aria-modal="true"
         >
-          <figure
-            className="max-w-5xl w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={lightbox.src}
-              alt={lightbox.caption || ""}
-              className="w-full max-h-[82vh] object-contain rounded-xl shadow-2xl"
-            />
-            {lightbox.caption && (
-              <figcaption className="mt-2 text-center text-white/90">{lightbox.caption}</figcaption>
-            )}
-            <button
-              onClick={closeLightbox}
-              className="absolute top-3 right-3 h-10 w-10 rounded-full bg-white/90 text-black text-xl"
-              aria-label="Fechar"
-            >
-              ×
-            </button>
-          </figure>
+          <img
+            src={lightbox.src}
+            alt={lightbox.caption}
+            className="max-w-4xl w-full rounded-xl shadow-2xl object-contain"
+          />
+          {lightbox.caption && (
+            <p className="text-white mt-4 text-center text-sm md:text-base max-w-2xl">
+              {lightbox.caption}
+            </p>
+          )}
         </div>
       )}
+
+      {/* Animações */}
+      <style jsx global>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideLeft { from { opacity: 0; transform: translateX(-30px) } to { opacity: 1; transform: translateX(0) } }
+        @keyframes slideRight { from { opacity: 0; transform: translateX(30px) } to { opacity: 1; transform: translateX(0) } }
+        .animate-fadeIn { animation: fadeIn 0.8s ease forwards; }
+        .animate-slideDown { animation: slideDown 1s ease forwards; }
+        .animate-slideLeft { animation: slideLeft 1s ease forwards; }
+        .animate-slideRight { animation: slideRight 1s ease forwards; }
+      `}</style>
     </>
   );
 }

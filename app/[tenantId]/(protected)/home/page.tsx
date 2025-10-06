@@ -307,14 +307,6 @@ export default function HomePage() {
                   >
                     Completar agora
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => go("/perfil/senha")}
-                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
-                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                  >
-                    Alterar senha
-                  </button>
                 </div>
               </div>
             ) : (

@@ -12,6 +12,7 @@ type Me = {
   birthdate?: string | null;  // "YYYY-MM-DD"
   phone?: string | null;      // dígitos/máscara
   emailVerified?: boolean;
+  hasPassword?: boolean;      // se o usuário tem senha cadastrada
 };
 
 function isValidEmail(e: string) {
@@ -78,6 +79,9 @@ export default function ProfilePage() {
   const [showNew, setShowNew] = useState(false);
   const [showConf, setShowConf] = useState(false);
 
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [verifyStep, setVerifyStep] = useState(1);
+
   const phoneMasked = useMemo(() => maskPhone(phone), [phone]);
   const initials = initialsFromName(name || me?.name);
 
@@ -108,6 +112,7 @@ export default function ProfilePage() {
           birthdate: data.birthdate ?? null,
           phone: data.phone ?? null,
           emailVerified: !!data.emailVerified,
+          hasPassword: !!data.hasPassword, // ← backend deve enviar
         });
 
         setName(data.name || "");
@@ -484,66 +489,20 @@ export default function ProfilePage() {
 
                   {/* bloco de verificação aparece só se não verificado */}
                   {me?.emailVerified === false && (
-                    <div
-                      className="mt-3 rounded-xl border p-3 sm:p-4 bg-white"
-                      style={{ borderColor: "#efe7e5" }}
-                    >
-                      <div className="text-sm font-medium mb-2" style={{ color: "#9d8983" }}>
-                        Verifique seu e-mail
-                      </div>
-
-                      {/* Mobile: empilha | Desktop: lado a lado */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                        <button
-                          type="button"
-                          onClick={handleSendCode}
-                          disabled={cooldown > 0}
-                          className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-60"
-                          style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                        >
-                          {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Enviar código"}
-                        </button>
-
-                        <input
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={5}
-                          className="w-full sm:w-24 rounded-lg border px-3 py-2 outline-none"
-                          style={{ borderColor: "#e5e7eb", caretColor: "#9d8983", letterSpacing: "0.25em" }}
-                          placeholder="00000"
-                          value={verifyCode}
-                          onChange={(e) => setVerifyCode(only5Digits(e.target.value))}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={handleVerify}
-                          className="w-full sm:w-auto rounded-lg border px-3 py-2 bg-white hover:bg-gray-50"
-                          style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                        >
-                          Verificar
-                        </button>
-                      </div>
-
-                      {verifyError && (
-                        <div
-                          className="mt-2 rounded-lg border px-3 py-2 text-sm"
-                          style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
-                        >
-                          {verifyError}
-                        </div>
-                      )}
-                      {verifyInfo && (
-                        <div
-                          className="mt-2 rounded-lg border px-3 py-2 text-sm"
-                          style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
-                        >
-                          {verifyInfo}
-                        </div>
-                      )}
-
-                      <p className="text-[11px] text-gray-500 mt-2">
-                        Se mudar o e-mail, vamos pedir verificação novamente.
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerifyStep(1);
+                          setVerifyModalOpen(true);
+                        }}
+                        className="rounded-lg border px-4 py-2 bg-white hover:bg-gray-50 transition"
+                        style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                      >
+                        Verificar e-mail
+                      </button>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Clique para verificar seu e-mail e confirmar sua conta.
                       </p>
                     </div>
                   )}
@@ -587,14 +546,13 @@ export default function ProfilePage() {
                       "Salvar alterações"
                     )}
                   </button>
-
                   <button
                     type="button"
                     onClick={openPwd}
                     className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition"
                     style={{ borderColor: "#bca49d", color: "#9d8983" }}
                   >
-                    Alterar senha
+                    {me?.hasPassword ? "Alterar senha" : "Cadastrar senha"}
                   </button>
                 </div>
               </form>
@@ -603,14 +561,11 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ===== Dialog Alterar Senha ===== */}
+      {/* ===== Dialog Alterar/Cadastrar Senha ===== */}
       {pwdOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           {/* overlay */}
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={closePwd}
-          />
+          <div className="absolute inset-0 bg-black/30" onClick={closePwd} />
           {/* modal */}
           <div
             role="dialog"
@@ -620,7 +575,7 @@ export default function ProfilePage() {
           >
             <div className="flex items-center justify-between mb-2">
               <div className="text-base font-semibold" style={{ color: "#1D1411" }}>
-                Alterar senha
+                {me?.hasPassword ? "Alterar senha" : "Cadastrar senha"}
               </div>
               <button
                 onClick={closePwd}
@@ -636,34 +591,38 @@ export default function ProfilePage() {
             </p>
 
             <form onSubmit={handleChangePassword} className="grid gap-3">
-              {/* Senha atual */}
-              <div>
-                <label className="block text-sm mb-1">Senha atual</label>
-                <div className="relative">
-                  <input
-                    type={showCur ? "text" : "password"}
-                    autoComplete="current-password"
-                    className="w-full rounded-lg border pr-20 px-3 py-3 outline-none"
-                    style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
-                    onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
-                    onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
-                    value={currentPwd}
-                    onChange={(e) => setCurrentPwd(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCur((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border px-2 py-1 text-xs hover:bg-gray-50"
-                    style={{ borderColor: "#e5e7eb", color: "#9d8983" }}
-                  >
-                    {showCur ? "Ocultar" : "Mostrar"}
-                  </button>
+              {/* Senha atual — só aparece se já existir senha */}
+              {me?.hasPassword && (
+                <div>
+                  <label className="block text-sm mb-1">Senha atual</label>
+                  <div className="relative">
+                    <input
+                      type={showCur ? "text" : "password"}
+                      autoComplete="current-password"
+                      className="w-full rounded-lg border pr-20 px-3 py-3 outline-none"
+                      style={{ borderColor: "#e5e7eb", caretColor: "#9d8983" }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#bca49d")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                      value={currentPwd}
+                      onChange={(e) => setCurrentPwd(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCur((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border px-2 py-1 text-xs hover:bg-gray-50"
+                      style={{ borderColor: "#e5e7eb", color: "#9d8983" }}
+                    >
+                      {showCur ? "Ocultar" : "Mostrar"}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Nova senha */}
               <div>
-                <label className="block text-sm mb-1">Nova senha</label>
+                <label className="block text-sm mb-1">
+                  {me?.hasPassword ? "Nova senha" : "Senha"}
+                </label>
                 <div className="relative">
                   <input
                     type={showNew ? "text" : "password"}
@@ -684,12 +643,14 @@ export default function ProfilePage() {
                     {showNew ? "Ocultar" : "Mostrar"}
                   </button>
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">Mín. 8 caracteres, com letra e número.</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Mín. 8 caracteres, com letra e número.
+                </p>
               </div>
 
               {/* Confirmar nova senha */}
               <div>
-                <label className="block text-sm mb-1">Confirmar nova senha</label>
+                <label className="block text-sm mb-1">Confirmar senha</label>
                 <div className="relative">
                   <input
                     type={showConf ? "text" : "password"}
@@ -714,18 +675,12 @@ export default function ProfilePage() {
 
               {/* mensagens */}
               {pwdError && (
-                <div
-                  className="rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}
-                >
+                <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#fee2e2", color: "#b91c1c", background: "#fff1f2" }}>
                   {pwdError}
                 </div>
               )}
               {pwdMsg && (
-                <div
-                  className="rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}
-                >
+                <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#DEF7EC", color: "#03543F", background: "#F3FAF7" }}>
                   {pwdMsg}
                 </div>
               )}
@@ -747,7 +702,7 @@ export default function ProfilePage() {
                       Salvando…
                     </span>
                   ) : (
-                    "Salvar nova senha"
+                    me?.hasPassword ? "Salvar nova senha" : "Cadastrar senha"
                   )}
                 </button>
 
@@ -762,6 +717,95 @@ export default function ProfilePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+            {/* === Modal de verificação === */}
+      {verifyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setVerifyModalOpen(false)} />
+          <div
+            className={`relative w-full max-w-md rounded-2xl border bg-white shadow-2xl p-6 sm:p-8 transition-all duration-500 ${
+              verifyStep === 1 ? "animate-slideInLeft" : "animate-slideInRight"
+            }`}
+          >
+            <h2 className="text-xl font-semibold text-center mb-4 text-[#9d8983]">
+              Verificação de E-mail
+            </h2>
+            <div className="flex justify-center gap-2 mb-6">
+              {[1, 2].map((n) => (
+                <div
+                  key={n}
+                  className={`h-2 w-12 rounded-full transition-colors ${
+                    n <= verifyStep ? "bg-[#bca49d]" : "bg-gray-200"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {verifyStep === 1 ? (
+              <div className="text-center space-y-4 animate-fadeIn">
+                <p className="text-gray-600 text-sm">
+                  Enviaremos um código para o e-mail abaixo:
+                </p>
+                <p className="font-medium">{email}</p>
+                {verifyError && <p className="text-red-600 text-sm">{verifyError}</p>}
+                {verifyInfo && <p className="text-green-600 text-sm">{verifyInfo}</p>}
+                <button
+                  onClick={async () => {
+                    await handleSendCode();
+                    if (!verifyError) setVerifyStep(2);
+                  }}
+                  disabled={cooldown > 0}
+                  className="w-full rounded-xl border px-4 py-3 text-sm font-medium transition disabled:opacity-60"
+                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                >
+                  {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Enviar código"}
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await handleVerify(e);
+                }}
+                className="text-center space-y-4 animate-fadeIn"
+              >
+                <p className="text-gray-600 text-sm">
+                  Digite o código recebido em seu e-mail:
+                </p>
+                <input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={5}
+                  className="w-40 text-center text-lg tracking-widest rounded-lg border px-3 py-2 outline-none"
+                  style={{ borderColor: "#bca49d", caretColor: "#9d8983" }}
+                  placeholder="00000"
+                  value={verifyCode}
+                  onChange={(e) => setVerifyCode(only5Digits(e.target.value))}
+                  required
+                />
+                {verifyError && <p className="text-red-600 text-sm">{verifyError}</p>}
+                {verifyInfo && <p className="text-green-600 text-sm">{verifyInfo}</p>}
+                <button
+                  type="submit"
+                  className="w-full rounded-xl border px-4 py-3 text-sm font-medium transition"
+                  style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                >
+                  Confirmar código
+                </button>
+              </form>
+            )}
+
+            <div className="text-center mt-6">
+              <button
+                onClick={() => setVerifyModalOpen(false)}
+                className="text-sm text-gray-500 hover:underline"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

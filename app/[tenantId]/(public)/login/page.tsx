@@ -66,11 +66,11 @@ async function handleSubmit(e: React.FormEvent) {
   }
 }
 
-/** callback do Google (recebe o credential: ID Token) */
 async function onGoogleCredential(credential: string) {
   try {
     setError("");
     setLoading(true);
+
     const r = await fetch(`${API}/api/client-portal/login/google`, {
       method: "POST",
       headers: {
@@ -79,33 +79,124 @@ async function onGoogleCredential(credential: string) {
       },
       body: JSON.stringify({ idToken: credential }),
     });
+
     const data = await r.json();
+    console.log("🔍 Google Login / resposta:", data);
     if (!r.ok) throw new Error(data?.error || "Falha no login com Google.");
 
-    if (data.preToken) {
-      // primeira vez neste tenant -> guarda preToken e leva para complete-profile
+    // ✅ CLIENTE EXISTENTE
+    if (data.existing && data.token) {
+      const email = data.client?.email || "";
+      const confirmedKey = `googleConfirmed:${email}`;
+
+      // 🔹 Verifica se o usuário já confirmou antes
+      const alreadyConfirmed = localStorage.getItem(confirmedKey) === "true";
+
+      if (!alreadyConfirmed) {
+        console.log("🟢 Primeira vez com Google — confirmando dados...");
+        await showConfirmModal(data.client);
+        localStorage.setItem(confirmedKey, "true"); // marca como confirmado
+      } else {
+        console.log("⚡ Login automático via Google — já confirmado antes.");
+      }
+
+      localStorage.setItem("clientPortalToken", data.token);
+      localStorage.setItem("clientPortalTenant", String(tenantId));
+      router.replace(`/${tenantId}/home`);
+      return;
+    }
+
+    // 🚀 NOVO CLIENTE → completar perfil
+    if (data.preToken && !data.existing) {
       sessionStorage.setItem("clientPortalPreToken", data.preToken);
       router.replace(`/${tenantId}/complete-profile`);
       return;
     }
 
-    localStorage.setItem("clientPortalToken", data.token);
-    localStorage.setItem("clientPortalTenant", String(tenantId));
-
-    const params = new URLSearchParams(window.location.search);
-    let next = params.get("next") || (data.needsProfile ? "/complete-profile" : "/home");
-    if (tenantId && next.startsWith(`/${tenantId}`)) {
-      next = next.slice(tenantId.length + 1) || "/home";
-    }
-
-    router.replace(`/${tenantId}${next}`);
+    throw new Error("Resposta inesperada do servidor.");
   } catch (e: any) {
+    console.error("❌ Erro no login Google:", e);
     setError(e?.message || "Falha no login com Google.");
   } finally {
     setLoading(false);
   }
 }
 
+async function showConfirmModal(client: any) {
+  // formata a data para DD/MM/YYYY
+  function formatDate(dateStr: string) {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  // formata o telefone para (XX) XXXXX-XXXX
+  function formatPhone(phone: string) {
+    if (!phone) return "—";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length === 10)
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    if (digits.length === 11)
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    return phone;
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const modal = document.createElement("div");
+    modal.className =
+      "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4";
+
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center animate-fadeIn relative">
+        <h2 class="text-2xl font-semibold mb-2 text-[#9d8983]">Confirmação de Dados</h2>
+        <p class="text-gray-600 text-sm mb-6">
+          Antes de continuar, confirme se seus dados abaixo estão corretos. 
+          <br/>Essa verificação será exibida apenas <strong>uma única vez</strong> para este e-mail.
+        </p>
+
+        <div class="bg-gray-50 border rounded-xl text-left text-sm px-4 py-3 space-y-2 mb-6">
+          <div><strong>Nome:</strong> ${client?.name || "—"}</div>
+          <div><strong>Data de Nascimento:</strong> ${formatDate(client?.birthdate)}</div>
+          <div><strong>WhatsApp:</strong> ${formatPhone(client?.phone)}</div>
+          <div><strong>E-mail:</strong> ${client?.email || "—"}</div>
+        </div>
+
+        <div class="flex justify-center gap-3 mt-2">
+          <button id="cancelBtn"
+            class="px-4 py-2 rounded-lg border text-gray-600 hover:bg-gray-100 transition">
+            Cancelar
+          </button>
+          <button id="confirmBtn"
+            class="px-5 py-2 rounded-lg text-white font-medium shadow-md hover:opacity-90 transition"
+            style="background:#bca49d;border-color:#bca49d;">
+            Confirmar e continuar
+          </button>
+        </div>
+
+        <p class="text-[11px] text-gray-400 mt-5">
+          © ${new Date().getFullYear()} Estety Cloud — Portal do Cliente
+        </p>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Fecha modal
+    modal.querySelector("#cancelBtn")?.addEventListener("click", () => {
+      modal.remove();
+      reject(new Error("cancelado"));
+    });
+
+    modal.querySelector("#confirmBtn")?.addEventListener("click", () => {
+      modal.remove();
+      resolve();
+    });
+  });
+}
 
   /** inicializa o botão do Google quando o script carrega */
   function initGoogle() {
