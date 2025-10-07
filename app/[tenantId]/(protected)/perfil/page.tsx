@@ -13,6 +13,7 @@ type Me = {
   phone?: string | null;      // dígitos/máscara
   emailVerified?: boolean;
   hasPassword?: boolean;      // se o usuário tem senha cadastrada
+  picture: string | null;
 };
 
 function isValidEmail(e: string) {
@@ -113,6 +114,7 @@ export default function ProfilePage() {
           phone: data.phone ?? null,
           emailVerified: !!data.emailVerified,
           hasPassword: !!data.hasPassword, // ← backend deve enviar
+          picture: data.picture ?? null,
         });
 
         setName(data.name || "");
@@ -141,6 +143,17 @@ export default function ProfilePage() {
       if (cooldownTimer.current) window.clearInterval(cooldownTimer.current);
     };
   }, [cooldown]);
+
+  const missingSteps = useMemo(() => {
+  if (!me) return [];
+
+  const steps = [];
+  if (!me.emailVerified) steps.push("Verificação de e-mail pendente");
+  if (!me.birthdate) steps.push("Informar data de nascimento");
+  if (!me.phone) steps.push("Adicionar número de WhatsApp");
+
+  return steps;
+}, [me]);
 
   function validateProfile() {
     if (!name) return "Informe seu nome.";
@@ -354,6 +367,31 @@ export default function ProfilePage() {
         </div>
       </header>
 
+      {/* AVISO DE PENDÊNCIAS */}
+      {missingSteps.length > 0 && (
+        <div className="mx-auto max-w-3xl px-3 sm:px-4 mt-4">
+          <div
+            className="rounded-xl border-l-4 px-4 py-3 text-sm shadow-sm bg-[#fffaf9]"
+            style={{ borderColor: "#bca49d", color: "#4b2e2b" }}
+          >
+            <p className="font-medium mb-1 flex items-center gap-2">
+              <span className="text-yellow-500 text-lg">⚠️</span>
+              <span>Sua conta ainda não está completa:</span>
+            </p>
+
+            <ul className="list-disc ml-5 space-y-1 text-[13px]">
+              {missingSteps.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Complete os itens acima para ativar totalmente seu acesso.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-3xl px-3 sm:px-4 py-6 sm:py-8">
         <div
           className="rounded-2xl border bg-white/90 backdrop-blur p-4 sm:p-6 shadow-sm"
@@ -398,14 +436,21 @@ export default function ProfilePage() {
                   }}
                   aria-label="Avatar"
                 >
-                  {initials ? (
-                    <span className="text-lg font-semibold">{initials}</span>
-                  ) : (
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
-                    </svg>
-                  )}
+                {me?.picture ? (
+                  <img
+                    src={me.picture}
+                    alt={me.name || "Foto de perfil"}
+                    className="h-14 w-14 rounded-full object-cover border border-[#e9dedb]"
+                    referrerPolicy="no-referrer" // evita bloqueios do Google
+                  />
+                ) : initials ? (
+                  <span className="text-lg font-semibold">{initials}</span>
+                ) : (
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-base font-semibold truncate" style={{ color: "#1D1411" }}>
@@ -497,7 +542,7 @@ export default function ProfilePage() {
                           setVerifyModalOpen(true);
                         }}
                         className="rounded-lg border px-4 py-2 bg-white hover:bg-gray-50 transition"
-                        style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                        style={{ borderColor: "#bca49d", color: "#9d8983", width: "100%" }}
                       >
                         Verificar e-mail
                       </button>
@@ -529,6 +574,15 @@ export default function ProfilePage() {
                 {/* Ações */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-1">
                   <button
+                    type="button"
+                    onClick={openPwd}
+                    className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    {me?.hasPassword ? "Alterar senha" : "Cadastrar senha"}
+                  </button>
+
+                  <button
                     type="submit"
                     disabled={saving}
                     className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition disabled:opacity-60"
@@ -545,14 +599,6 @@ export default function ProfilePage() {
                     ) : (
                       "Salvar alterações"
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openPwd}
-                    className="w-full sm:w-auto rounded-xl border px-4 py-2.5 bg-white hover:bg-gray-50 transition"
-                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
-                  >
-                    {me?.hasPassword ? "Alterar senha" : "Cadastrar senha"}
                   </button>
                 </div>
               </form>

@@ -13,7 +13,9 @@ type Me = {
   birthdate?: string | null;
   phone?: string | null;
   emailVerified?: boolean;
+  picture?: string | null;
 };
+
 
 function initialsFromName(name?: string) {
   const parts = String(name || "").trim().split(/\s+/).slice(0, 2);
@@ -87,6 +89,7 @@ export default function HomePage() {
           birthdate: data.birthdate ?? null,
           phone: data.phone ?? null,
           emailVerified: !!data.emailVerified,
+          picture: data.picture ?? null,
         });
       } catch (err: any) {
         setError(err.message || "Falha ao carregar");
@@ -228,7 +231,7 @@ export default function HomePage() {
             <div className="rounded-2xl border bg-white/90 backdrop-blur p-6 shadow-sm min-w-0" style={{ borderColor: "#efe7e5" }}>
               <div className="flex items-start gap-4 min-w-0">
                 <div
-                  className="inline-flex items-center justify-center rounded-full shrink-0"
+                  className="inline-flex items-center justify-center rounded-full shrink-0 overflow-hidden"
                   style={{
                     width: 64,
                     height: 64,
@@ -238,7 +241,14 @@ export default function HomePage() {
                   }}
                   aria-label="Avatar"
                 >
-                  {initials ? (
+                  {me?.picture ? (
+                    <img
+                      src={me.picture}
+                      alt={me.name || "Foto de perfil"}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : initials ? (
                     <span className="text-xl font-semibold">{initials}</span>
                   ) : (
                     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>

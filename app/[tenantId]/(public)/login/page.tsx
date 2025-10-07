@@ -86,16 +86,25 @@ async function onGoogleCredential(credential: string) {
 
     // ✅ CLIENTE EXISTENTE
     if (data.existing && data.token) {
-      const email = data.client?.email || "";
-      const confirmedKey = `googleConfirmed:${email}`;
+      const isGoogleUser = !!data.client?.loginGoogle;
 
-      // 🔹 Verifica se o usuário já confirmou antes
-      const alreadyConfirmed = localStorage.getItem(confirmedKey) === "true";
-
-      if (!alreadyConfirmed) {
-        console.log("🟢 Primeira vez com Google — confirmando dados...");
+      if (!isGoogleUser) {
+        console.log("🟢 Primeiro login com Google — confirmando dados...");
         await showConfirmModal(data.client);
-        localStorage.setItem(confirmedKey, "true"); // marca como confirmado
+
+        try {
+          await fetch(`${API}/api/client-portal/mark-google-confirmed`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "x-tenant-id": String(tenantId || ""),
+              Authorization: `Bearer ${data.token}`,
+            },
+            body: JSON.stringify({ loginGoogle: true }),
+          });
+        } catch (err) {
+          console.warn("⚠️ Falha ao marcar loginGoogle no servidor:", err);
+        }
       } else {
         console.log("⚡ Login automático via Google — já confirmado antes.");
       }
@@ -123,15 +132,20 @@ async function onGoogleCredential(credential: string) {
 }
 
 async function showConfirmModal(client: any) {
-  // formata a data para DD/MM/YYYY
+    // formata a data para DD/MM/YYYY
   function formatDate(dateStr: string) {
     if (!dateStr) return "—";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    // aceita formatos como YYYY-MM-DD ou ISO (com T)
+    const clean = String(dateStr).trim();
+    const parts = clean.split("T")[0].split("-"); // extrai apenas a parte da data
+    if (parts.length === 3) {
+      const [y, m, d] = parts.map(Number);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+      }
+    }
+    // fallback: se for outro formato
+    return clean;
   }
 
   // formata o telefone para (XX) XXXXX-XXXX
