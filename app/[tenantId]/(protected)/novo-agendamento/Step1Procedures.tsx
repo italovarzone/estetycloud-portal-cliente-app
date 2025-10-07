@@ -24,6 +24,7 @@ type Proc = {
   price: number;
   duration?: number;
   status?: number | string | boolean;
+  restrictions?: (string | number)[];
 };
 
 export default function Step1Procedures({
@@ -41,6 +42,9 @@ export default function Step1Procedures({
   const [procedures, setProcedures] = useState<Proc[]>([]);
   const [loading, setLoading] = useState(true);
   const [abortOpen, setAbortOpen] = useState(false);
+
+  const [lastCompleted, setLastCompleted] = useState<string | null>(null);
+  const [lastHasRestrictions, setLastHasRestrictions] = useState<boolean>(false);
 
   // snapshot do agendamento em edição (salvo a partir da tela "Meus agendamentos")
   const [editingAppt, setEditingAppt] = useState<any>(null);
@@ -65,12 +69,60 @@ export default function Step1Procedures({
     async function load() {
       try {
         const token = localStorage.getItem("clientPortalToken") || "";
-        const res = await fetch(`${apiBase()}/api/client-portal/procedures`, {
-          headers: { Authorization: `Bearer ${token}`, "x-tenant-id": String(tenantId || "") },
-        });
+        const headers = { Authorization: `Bearer ${token}`, "x-tenant-id": String(tenantId || "") };
+
+        // 1️⃣ Busca todos os procedimentos ativos
+        const res = await fetch(`${apiBase()}/api/client-portal/procedures`, { headers });
         const data = await res.json();
-        setProcedures(Array.isArray(data.procedures) ? data.procedures : []);
-      } catch {
+        let list: Proc[] = Array.isArray(data.procedures) ? data.procedures : [];
+
+        // 2️⃣ Busca último procedimento concluído
+        const lastRes = await fetch(`${apiBase()}/api/client-portal/appointments/last-completed`, { headers });
+        const lastData = await lastRes.json();
+
+        setLastCompleted(lastData.last?.procedures?.[0] || null);
+
+        const lastProcedures = Array.isArray(lastData.last?.procedures) ? lastData.last.procedures : [];
+        debugger;
+        if (!lastData.last) {
+          // ⚠️ Caso não tenha nenhum histórico concluído → exibir apenas procedimentos sem restrições
+          list = list.filter(p => !Array.isArray(p.restrictions) || !p.restrictions.length);
+          setProcedures(list);
+          return;
+        }
+
+        // 3️⃣ Busca os procedimentos do último agendamento
+        const names = lastProcedures.map(n => encodeURIComponent(n));
+        const procsRes = await fetch(
+          `${apiBase()}/api/client-portal/procedures/by-names?names=${names.join(",")}`,
+          { headers }
+        );
+        const procsData = await procsRes.json();
+        const lastFullProcs = Array.isArray(procsData.procedures) ? procsData.procedures : [];
+
+        // 4️⃣ Verifica se algum dos últimos procedimentos tem restrições
+        const restricted = lastFullProcs.filter(p => Array.isArray(p.restrictions) && p.restrictions.length);
+
+        if (restricted.length > 0) setLastHasRestrictions(true);
+
+        if (!restricted.length) {
+          // Nenhuma restrição encontrada → pode exibir todos os ativos
+          setProcedures(list);
+          return;
+        }
+
+        // 5️⃣ Coleta os IDs permitidos de todos os "restritos"
+        const allowedIds = restricted.flatMap(p => p.restrictions.map(String));
+
+        // 6️⃣ Filtra: mantém apenas os sem restrição OU dentro da lista permitida
+        list = list.filter(p => {
+          const hasRest = Array.isArray(p.restrictions) && p.restrictions.length > 0;
+          return !hasRest || allowedIds.includes(String(p._id));
+        });
+
+        setProcedures(list);
+      } catch (err) {
+        console.error("Erro ao carregar procedimentos:", err);
         setProcedures([]);
       } finally {
         setLoading(false);
@@ -173,6 +225,35 @@ export default function Step1Procedures({
 
       <h2 className="font-medium">Selecione os procedimentos:</h2>
 
+      {/* Se o cliente tiver um procedimento concluído */}
+      {lastCompleted && (
+        <div
+          className="border rounded-lg p-3 mb-3"
+          style={{ borderColor: "#e6cfc9", background: "#fdf8f7" }}
+        >
+          <div className="text-sm text-gray-700">
+            Último procedimento concluído:
+            <span className="font-medium" style={{ color: "#9d8983" }}> {lastCompleted}</span>
+          </div>
+
+          {lastHasRestrictions ? (
+            <div
+              className="mt-2 text-xs rounded-md py-2 px-3 border"
+              style={{ background: "#fff8f6", borderColor: "#e6cfc9", color: "#9d8983" }}
+            >
+              <i className="fa-solid fa-lightbulb text-amber-400 mr-1"></i>
+              Este procedimento tem sequência restrita. Selecione um dos procedimentos compatíveis.
+            </div>
+          ) : (
+            <div
+              className="mt-2 text-xs text-gray-500"
+            >
+              Você pode escolher livremente qualquer procedimento ativo.
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="space-y-3">
         {activeProcedures.map((p) => {
           const id = String(p._id);
