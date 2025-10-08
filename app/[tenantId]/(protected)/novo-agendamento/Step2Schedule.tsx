@@ -156,6 +156,63 @@ export default function Step2Schedule({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const restrictName = search.get("restrictName");
+  const restrictDays = Number(search.get("restrictDays") || 0);
+  const [restrictionInfo, setRestrictionInfo] = useState<{ name: string; days: number } | null>(() =>
+    restrictName && restrictDays ? { name: decodeURIComponent(restrictName), days: restrictDays } : null
+  );
+
+  const [allowedWeek, setAllowedWeek] =
+    useState<{ start: string; end: string } | null>(null);
+
+  // useEffect(() => {
+  //   try {
+  //     const saved = sessionStorage.getItem("restrictionInfo");
+  //     setRestrictionInfo(saved ? JSON.parse(saved) : null);
+  //   } catch {
+  //     setRestrictionInfo(null);
+  //   }
+  // }, []);
+
+  useEffect(() => {
+    if (!restrictionInfo) { setAllowedWeek(null); return; }
+
+    (async () => {
+      const token = localStorage.getItem("clientPortalToken") || "";
+      const headers = { Authorization: `Bearer ${token}`, "x-tenant-id": tenantId };
+      const r = await fetch(`${apiBase()}/api/client-portal/appointments/last-completed`, { headers });
+      const data = await r.json();
+      if (!data?.last?.date) return;
+
+      const [y, m, d] = String(data.last.date).split("-").map(Number);
+      const base = new Date(y, m - 1, d);
+      base.setDate(base.getDate() + Number(restrictionInfo.days || 0));
+
+      // segunda → domingo
+      const dow = base.getDay();                          // 0=Dom..6=Sáb
+      const monday = new Date(base); monday.setDate(base.getDate() - ((dow + 6) % 7));
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+
+      // se tiver defaultHoursByDay, usamos pra definir o 1º e último dia realmente habilitados
+      const weekCfg = (defaultHoursByDay && defaultHoursByDay.length === 7)
+        ? defaultHoursByDay
+        : Array.from({ length: 7 }).map(() => ({ enabled: true, start: "07:00", end: "19:00" }));
+
+      const allowedDays: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const cur = new Date(monday);
+        cur.setDate(monday.getDate() + i);
+        if (weekCfg[cur.getDay()]?.enabled) allowedDays.push(toYMD(cur));
+      }
+
+      const start = allowedDays[0] || toYMD(monday);
+      const end   = allowedDays[allowedDays.length - 1] || toYMD(sunday);
+
+      setAllowedWeek({ start, end });
+      setMonthCursor(new Date(base.getFullYear(), base.getMonth(), 1));
+      setSelectedDate((cur) => (cur < start || cur > end) ? start : cur);
+    })().catch(() => setAllowedWeek(null));
+  }, [restrictionInfo/*, defaultHoursByDay*/]);
 
   /* catálogo de procedimentos */
   useEffect(() => {
@@ -534,34 +591,43 @@ export default function Step2Schedule({
         </div>
       )}
 
-      {/* botão (i) no topo */}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setShowInfo((v) => !v)}
-          aria-label="Horários disponíveis"
-          className="w-7 h-7 rounded-full border flex items-center justify-center text-xs hover:bg-gray-50"
-          title="Horários disponíveis"
-        >
-          i
-        </button>
+      <div className="rounded-xl border p-3 bg-amber-50/40">
+        <div className="font-medium text-sm mb-2">Horários disponíveis</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-gray-700">
+          {weeklyLines.map((l) => (
+            <div key={l.name} className="flex justify-between gap-2">
+              <span className="text-gray-600">{l.short}</span>
+              <span className="font-medium">{l.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-gray-500 mt-1">
+          * Pode haver exceções em dias específicos (ausências ou janelas extras).
+        </div>
       </div>
 
-      {/* painel colapsável com os horários por dia */}
-      {showInfo && (
-        <div className="rounded-xl border p-3 bg-amber-50/40">
-          <div className="font-medium text-sm mb-2">Horários disponíveis</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-gray-700">
-            {weeklyLines.map((l) => (
-              <div key={l.name} className="flex justify-between gap-2">
-                <span className="text-gray-600">{l.short}</span>
-                <span className="font-medium">{l.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="text-[11px] text-gray-500 mt-1">
-            * Pode haver exceções em dias específicos (ausências ou janelas extras).
-          </div>
+      {allowedWeek && (
+        <div
+          className="rounded-lg border p-3 bg-amber-50/40 text-sm mb-2"
+          style={{ borderColor: "#ffde5cff" }}
+        >
+          <b style={{ color: "#ae8b00ff" }}>Atenção:</b>{" "}
+          Este procedimento só pode ser reagendado entre{" "}
+          <b>
+            {(() => {
+              const [y, m, d] = allowedWeek.start.split("-").map(Number);
+              return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+            })()}
+          </b>{" "}
+          e{" "}
+          <b>
+            {(() => {
+              const [y, m, d] = allowedWeek.end.split("-").map(Number);
+              return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+            })()}
+          </b>
+          , conforme a política de retorno de{" "}
+          <b>{restrictionInfo?.days}</b> dias.
         </div>
       )}
 
@@ -605,8 +671,18 @@ export default function Step2Schedule({
 
                 // exceções do dia selecionado já vêm do endpoint do próprio dia
                 const isAbsentException = false;
+                let blockedByRestriction = false;
+                if (allowedWeek) {
+                  const ymdStr = toYMD(d);
+                  if (ymdStr < allowedWeek.start || ymdStr > allowedWeek.end) blockedByRestriction = true;
+                }
 
-                const isDayOff = past || isDayOffFromMonth || isDefaultClosed || isAbsentException;
+                const isDayOff =
+                  past ||
+                  isDayOffFromMonth ||
+                  isDefaultClosed ||
+                  isAbsentException ||
+                  blockedByRestriction;
 
                 return (
                   <button
