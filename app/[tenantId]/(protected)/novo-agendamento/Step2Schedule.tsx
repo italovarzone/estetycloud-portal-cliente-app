@@ -9,6 +9,10 @@ const STEP_MIN = 30;
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const DH_NAMES = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
+}
+
 type DayCfg = { enabled: boolean; start: string | null; end: string | null };
 
 function apiBase() {
@@ -559,7 +563,62 @@ export default function Step2Schedule({
     });
   }, [defaultHoursByDay]);
 
-  if (loading) return <div>Carregando…</div>;
+  // dentro do componente Step2Schedule...
+  if (loading) {
+    return (
+      <div className="space-y-5 pb-28">
+        <StepProgress current={2} />
+
+        {/* 🩶 header skeleton */}
+        <div className="flex justify-between items-center">
+          <Skeleton className="w-40 h-5" />
+          <Skeleton className="w-10 h-5" />
+        </div>
+
+        {/* 🩶 aviso skeleton */}
+        <Skeleton className="h-16 w-full rounded-xl" />
+
+        {/* 🩶 calendario skeleton */}
+        <div className="rounded-xl border p-3 space-y-3">
+          <div className="flex justify-between items-center">
+            <Skeleton className="w-6 h-6 rounded" />
+            <Skeleton className="w-32 h-5 rounded" />
+            <Skeleton className="w-6 h-6 rounded" />
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 rounded" />
+            ))}
+          </div>
+        </div>
+
+        {/* 🩶 slots skeleton */}
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Skeleton className="w-32 h-4" />
+            <Skeleton className="w-16 h-4" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10" />
+            ))}
+          </div>
+        </div>
+
+        {/* 🩶 footer skeleton */}
+        <div className="fixed inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t">
+          <div className="mx-auto w-full max-w-md p-4 space-y-3">
+            <Skeleton className="h-4 w-2/3" />
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-1/3" />
+              <Skeleton className="h-10 w-1/3" />
+              <Skeleton className="h-10 flex-1" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const selDateObj = parseYMD(selectedDate);
 
   const baseLabel =
@@ -722,10 +781,18 @@ export default function Step2Schedule({
             {selDateObj.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}
           </div>
           <div className="text-xs text-gray-500">Janela: {labelWindow}</div>
-          {loadingDay && <div className="text-xs text-gray-400">carregando…</div>}
         </div>
 
-        {isPastSelectedDay ? (
+        {/* 🩶 enquanto carrega o dia, mostra skeletons */}
+        {loadingDay ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-10" />
+              ))}
+            </div>
+          </div>
+        ) : isPastSelectedDay ? (
           <div className="text-sm text-gray-500">Dia no passado — agendamentos não permitidos.</div>
         ) : hasDayOffException ? (
           <div className="text-sm text-gray-500">Dia indisponível para agendamentos (ausência).</div>
@@ -737,10 +804,9 @@ export default function Step2Schedule({
               <button
                 key={t}
                 onClick={() => setPickedTime(t)}
-                className={[
-                  "py-2 rounded-lg border text-sm",
-                  pickedTime === t ? "bg-rose-50 border-rose-300" : "bg-white hover:bg-gray-50",
-                ].join(" ")}
+                className={`py-2 rounded-lg border text-sm ${
+                  pickedTime === t ? "bg-rose-50 border-rose-300" : "bg-white hover:bg-gray-50"
+                }`}
                 style={{ borderColor: pickedTime === t ? "#e6cfc9" : "#e5e7eb", color: "#222" }}
               >
                 {t}
