@@ -80,7 +80,8 @@ export default function Step1Procedures({
     async function load() {
       try {
         const token = localStorage.getItem("clientPortalToken") || "";
-        const headers = { Authorization: `Bearer ${token}`, "x-tenant-id": String(tenantId || "") };
+        const headers: any = { "x-tenant-id": String(tenantId || "") };
+        if (token) headers.Authorization = `Bearer ${token}`;
 
         // 1) Todos os procedimentos ativos
         const res = await fetch(`${apiBase()}/api/client-portal/procedures`, { headers });
@@ -89,42 +90,48 @@ export default function Step1Procedures({
         setProcedures(list);
 
         // 2) Último procedimento concluído (texto do topo)
-        const lastRes = await fetch(`${apiBase()}/api/client-portal/appointments/last-completed`, { headers });
-        const lastData = await lastRes.json();
-        setLastCompleted(lastData.last?.procedures?.[0] || null);
+          if (token) {
+              const lastRes = await fetch(`${apiBase()}/api/client-portal/appointments/last-completed`, { headers });
+              const lastData = await lastRes.json();
+              setLastCompleted(lastData.last?.procedures?.[0] || null);
 
-        // se existir último, checa se algum desses tem restrições (para exibir o aviso amarelinho)
-        if (lastData.last?.procedures?.length) {
-          const names = lastData.last.procedures.map((n: string) => encodeURIComponent(n));
-          const procsRes = await fetch(
-            `${apiBase()}/api/client-portal/procedures/by-names?names=${names.join(",")}`,
-            { headers }
-          );
-          const procsData = await procsRes.json();
-          const lastFull = Array.isArray(procsData.procedures) ? procsData.procedures : [];
-          if (lastFull.some((p: any) => Array.isArray(p.restrictions) && p.restrictions.length)) {
-            setLastHasRestrictions(true);
+              // se existir último, checa se algum desses tem restrições (para exibir o aviso amarelinho)
+              if (lastData.last?.procedures?.length) {
+                const names = lastData.last.procedures.map((n: string) => encodeURIComponent(n));
+                const procsRes = await fetch(
+                  `${apiBase()}/api/client-portal/procedures/by-names?names=${names.join(",")}`,
+                  { headers }
+                );
+                const procsData = await procsRes.json();
+                const lastFull = Array.isArray(procsData.procedures) ? procsData.procedures : [];
+                if (lastFull.some((p: any) => Array.isArray(p.restrictions) && p.restrictions.length)) {
+                  setLastHasRestrictions(true);
+                }
+              }
+
+              // 3) Histórico de concluídos (para checagem de compatibilidade ao selecionar)
+              const completedRes = await fetch(`${apiBase()}/api/client-portal/appointments/completed`, { headers });
+              const completed: CompletedAppt[] = await completedRes.json();
+
+              // mapeia nomes -> _id (para quando não vier procedureId)
+              const nameToId = new Map<string, string>(list.map((p) => [String(p.name || "").toLowerCase(), String(p._id)]));
+
+              const ids = new Set<string>();
+              for (const ap of completed || []) {
+                for (const pr of ap.procedures || []) {
+                  if (pr.procedureId) ids.add(String(pr.procedureId));
+                  else if (pr.name) {
+                    const idByName = nameToId.get(String(pr.name).toLowerCase());
+                    if (idByName) ids.add(idByName);
+                  }
+                }
+              }
+            setCompletedIds(ids);
+          } else {
+            setLastCompleted(null);
+            setLastHasRestrictions(false);
+            setCompletedIds(new Set());
           }
-        }
-
-        // 3) Histórico de concluídos (para checagem de compatibilidade ao selecionar)
-        const completedRes = await fetch(`${apiBase()}/api/client-portal/appointments/completed`, { headers });
-        const completed: CompletedAppt[] = await completedRes.json();
-
-        // mapeia nomes -> _id (para quando não vier procedureId)
-        const nameToId = new Map<string, string>(list.map((p) => [String(p.name || "").toLowerCase(), String(p._id)]));
-
-        const ids = new Set<string>();
-        for (const ap of completed || []) {
-          for (const pr of ap.procedures || []) {
-            if (pr.procedureId) ids.add(String(pr.procedureId));
-            else if (pr.name) {
-              const idByName = nameToId.get(String(pr.name).toLowerCase());
-              if (idByName) ids.add(idByName);
-            }
-          }
-        }
-        setCompletedIds(ids);
       } catch (err) {
         console.error("Erro ao carregar procedimentos:", err);
       } finally {

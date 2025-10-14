@@ -8,6 +8,15 @@ function Fireworks({ duration = 2500 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
+    const after = sessionStorage.getItem("bookedAfterLogin");
+    if (after) {
+      // exibir toast/alerta “Agendamento confirmado após login.”
+      sessionStorage.removeItem("bookedAfterLogin");
+    }
+  }, []);
+
+
+  useEffect(() => {
     const c = canvasRef.current;
     const ctx = c.getContext("2d");
     let raf = 0, start = performance.now();

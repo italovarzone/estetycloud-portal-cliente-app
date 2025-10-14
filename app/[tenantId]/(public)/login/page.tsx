@@ -7,8 +7,105 @@ import Script from "next/script";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
 
+/* ===== helpers locais ===== */
 function isValidPassword(pw: string) {
   return pw && pw.length >= 8 && /[A-Za-z]/.test(pw) && /\d/.test(pw);
+}
+
+// pending booking em sessionStorage (TTL 10min)
+const PENDING_KEY = "pendingAppointment";
+const TTL_MS = 10 * 60 * 1000;
+
+type PendingPayload = {
+  tenantId: string;
+  isEditing?: boolean;
+  editId?: string | null;
+  payload: { date: string; time: string; procedures: { _id: string; name: string; price: number }[] };
+  ts: number;
+};
+
+function readPending(): PendingPayload | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PendingPayload;
+    if (Date.now() - (data.ts || 0) > TTL_MS) {
+      sessionStorage.removeItem(PENDING_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+function clearPending() {
+  sessionStorage.removeItem(PENDING_KEY);
+}
+
+// tenta concluir o agendamento pendente após salvar o token; retorna rota de sucesso (ou null)
+async function finalizePendingAfterLogin(tenantId: string): Promise<string | null> {
+  const pending = readPending();
+  if (!pending) return null;
+
+  try {
+    const token = localStorage.getItem("clientPortalToken") || "";
+    if (!token) return null;
+
+    const url = pending.isEditing && pending.editId
+      ? `${API}/api/client-portal/appointments/${encodeURIComponent(String(pending.editId))}`
+      : `${API}/api/client-portal/appointments`;
+    const method = pending.isEditing ? "PUT" : "POST";
+
+    const r = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "x-tenant-id": pending.tenantId,
+      },
+      body: JSON.stringify(pending.payload),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data?.error || "Falha ao finalizar agendamento.");
+
+    // montar resumo para tela de sucesso
+    const total = pending.payload.procedures.reduce((s, p) => s + Number(p.price || 0), 0);
+    const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+    const summary = {
+      id: data.id,
+      date: pending.payload.date,
+      time: pending.payload.time,
+      total: BRL.format(total),
+      procs: pending.payload.procedures.map((p) => p.name),
+    };
+
+    if (pending.isEditing) {
+      sessionStorage.setItem(
+        "lastEditedAppointment",
+        JSON.stringify({
+          id: pending.editId,
+          from: { date: "", time: "" }, // se precisar, pode ter sido salvo junto
+          to: { date: pending.payload.date, time: pending.payload.time },
+          procs: summary.procs,
+          total: summary.total,
+        })
+      );
+    } else {
+      sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
+    }
+
+    sessionStorage.setItem("bookedAfterLogin", "1");
+    clearPending();
+
+    // rota de sucesso
+    return pending.isEditing
+      ? `/${tenantId}/novo-agendamento/sucesso?edit=1`
+      : `/${tenantId}/novo-agendamento/sucesso`;
+  } catch (e) {
+    // se falhar, mantemos o pendente (TTL cuida); segue fluxo normal
+    console.warn("⚠️ Falha ao finalizar pendente:", e);
+    return null;
+  }
 }
 
 export default function LoginPage() {
@@ -19,198 +116,184 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");            // 👈 aviso amigável (ex.: “Entre para finalizar...”)
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
 
-async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setError("");
+  // mostra aviso salvo pelo Step2
+  useEffect(() => {
+    const msg = sessionStorage.getItem("loginMessage");
+    if (msg) {
+      setInfo(msg);
+      sessionStorage.removeItem("loginMessage");
+    }
+  }, []);
 
-  if (email && !/^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(email)) {
-    setError("Email inválido.");
-    return;
-  }
-  if (!isValidPassword(password)) {
-    setError("A senha deve ter no mínimo 8 caracteres, incluindo letra e número.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const r = await fetch(`${API}/api/client-portal/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-tenant-id": String(tenantId || "").trim(),
-      },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data?.error || "Falha no login.");
-
-    localStorage.setItem("clientPortalToken", data.token);
-    localStorage.setItem("clientPortalTenant", String(tenantId));
-
-    // 👇 trata o next
+  // util: resolve next da URL
+  function resolveNext(): string {
     const params = new URLSearchParams(window.location.search);
     let next = params.get("next") || "/home";
+    // normaliza para a raiz do tenant
     if (tenantId && next.startsWith(`/${tenantId}`)) {
       next = next.slice(tenantId.length + 1) || "/home";
     }
-
-    router.replace(`/${tenantId}${next}`);
-  } catch (err: any) {
-    setError(err.message || "Falha no login.");
-  } finally {
-    setLoading(false);
+    return `/${tenantId}${next}`;
   }
-}
 
-async function onGoogleCredential(credential: string) {
-  try {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError("");
-    setLoading(true);
 
-    const r = await fetch(`${API}/api/client-portal/login/google`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-tenant-id": String(tenantId || ""),
-      },
-      body: JSON.stringify({ idToken: credential }),
-    });
+    if (email && !/^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(email)) {
+      setError("Email inválido.");
+      return;
+    }
+    if (!isValidPassword(password)) {
+      setError("A senha deve ter no mínimo 8 caracteres, incluindo letra e número.");
+      return;
+    }
 
-    const data = await r.json();
-    console.log("🔍 Google Login / resposta:", data);
-    if (!r.ok) throw new Error(data?.error || "Falha no login com Google.");
-
-    // ✅ CLIENTE EXISTENTE
-    if (data.existing && data.token) {
-      const isGoogleUser = !!data.client?.loginGoogle;
-
-      if (!isGoogleUser) {
-        console.log("🟢 Primeiro login com Google — confirmando dados...");
-        await showConfirmModal(data.client);
-
-        try {
-          await fetch(`${API}/api/client-portal/mark-google-confirmed`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              "x-tenant-id": String(tenantId || ""),
-              Authorization: `Bearer ${data.token}`,
-            },
-            body: JSON.stringify({ loginGoogle: true }),
-          });
-        } catch (err) {
-          console.warn("⚠️ Falha ao marcar loginGoogle no servidor:", err);
-        }
-      } else {
-        console.log("⚡ Login automático via Google — já confirmado antes.");
-      }
+    try {
+      setLoading(true);
+      const r = await fetch(`${API}/api/client-portal/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": String(tenantId || "").trim(),
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Falha no login.");
 
       localStorage.setItem("clientPortalToken", data.token);
       localStorage.setItem("clientPortalTenant", String(tenantId));
-      router.replace(`/${tenantId}/home`);
-      return;
-    }
 
-    // 🚀 NOVO CLIENTE → completar perfil
-    if (data.preToken && !data.existing) {
-      sessionStorage.setItem("clientPortalPreToken", data.preToken);
-      router.replace(`/${tenantId}/complete-profile`);
-      return;
+      // 👇 tenta finalizar um agendamento pendente
+      const successRoute = await finalizePendingAfterLogin(String(tenantId));
+      router.replace(successRoute || resolveNext());
+    } catch (err: any) {
+      setError(err.message || "Falha no login.");
+    } finally {
+      setLoading(false);
     }
-
-    throw new Error("Resposta inesperada do servidor.");
-  } catch (e: any) {
-    console.error("❌ Erro no login Google:", e);
-    setError(e?.message || "Falha no login com Google.");
-  } finally {
-    setLoading(false);
   }
-}
 
-async function showConfirmModal(client: any) {
-    // formata a data para DD/MM/YYYY
-  function formatDate(dateStr: string) {
-    if (!dateStr) return "—";
-    // aceita formatos como YYYY-MM-DD ou ISO (com T)
-    const clean = String(dateStr).trim();
-    const parts = clean.split("T")[0].split("-"); // extrai apenas a parte da data
-    if (parts.length === 3) {
-      const [y, m, d] = parts.map(Number);
-      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-        return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+  async function onGoogleCredential(credential: string) {
+    try {
+      setError("");
+      setLoading(true);
+
+      const r = await fetch(`${API}/api/client-portal/login/google`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": String(tenantId || ""),
+        },
+        body: JSON.stringify({ idToken: credential }),
+      });
+
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Falha no login com Google.");
+
+      // ✅ CLIENTE EXISTENTE
+      if (data.existing && data.token) {
+        const isGoogleUser = !!data.client?.loginGoogle;
+
+        if (!isGoogleUser) {
+          await showConfirmModal(data.client);
+          try {
+            await fetch(`${API}/api/client-portal/mark-google-confirmed`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "x-tenant-id": String(tenantId || ""),
+                Authorization: `Bearer ${data.token}`,
+              },
+              body: JSON.stringify({ loginGoogle: true }),
+            });
+          } catch (err) {
+            console.warn("⚠️ Falha ao marcar loginGoogle no servidor:", err);
+          }
+        }
+
+        localStorage.setItem("clientPortalToken", data.token);
+        localStorage.setItem("clientPortalTenant", String(tenantId));
+
+        // 👇 tenta finalizar um agendamento pendente
+        const successRoute = await finalizePendingAfterLogin(String(tenantId));
+        router.replace(successRoute || resolveNext());
+        return;
       }
+
+      // 🚀 NOVO CLIENTE → completar perfil
+      if (data.preToken && !data.existing) {
+        sessionStorage.setItem("clientPortalPreToken", data.preToken);
+        router.replace(`/${tenantId}/complete-profile`);
+        return;
+      }
+
+      throw new Error("Resposta inesperada do servidor.");
+    } catch (e: any) {
+      console.error("❌ Erro no login Google:", e);
+      setError(e?.message || "Falha no login com Google.");
+    } finally {
+      setLoading(false);
     }
-    // fallback: se for outro formato
-    return clean;
   }
 
-  // formata o telefone para (XX) XXXXX-XXXX
-  function formatPhone(phone: string) {
-    if (!phone) return "—";
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length === 10)
-      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-    if (digits.length === 11)
-      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-    return phone;
+  async function showConfirmModal(client: any) {
+    function formatDate(dateStr: string) {
+      if (!dateStr) return "—";
+      const clean = String(dateStr).trim();
+      const parts = clean.split("T")[0].split("-");
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+        }
+      }
+      return clean;
+    }
+    function formatPhone(phone: string) {
+      if (!phone) return "—";
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+      if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+      return phone;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const modal = document.createElement("div");
+      modal.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4";
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center relative">
+          <h2 class="text-2xl font-semibold mb-2" style="color:#9d8983">Confirmação de Dados</h2>
+          <p class="text-gray-600 text-sm mb-6">
+            Antes de continuar, confirme se seus dados abaixo estão corretos.
+            <br/>Essa verificação será exibida apenas <strong>uma única vez</strong> para este e-mail.
+          </p>
+
+          <div class="bg-gray-50 border rounded-xl text-left text-sm px-4 py-3 space-y-2 mb-6">
+            <div><strong>Nome:</strong> ${client?.name || "—"}</div>
+            <div><strong>Data de Nascimento:</strong> ${formatDate(client?.birthdate)}</div>
+            <div><strong>WhatsApp:</strong> ${formatPhone(client?.phone)}</div>
+            <div><strong>E-mail:</strong> ${client?.email || "—"}</div>
+          </div>
+
+          <div class="flex justify-center gap-3 mt-2">
+            <button id="cancelBtn" class="px-4 py-2 rounded-lg border text-gray-600 hover:bg-gray-100">Cancelar</button>
+            <button id="confirmBtn" class="px-5 py-2 rounded-lg text-white font-medium" style="background:#bca49d">Confirmar e continuar</button>
+          </div>
+
+          <p class="text-[11px] text-gray-400 mt-5">© ${new Date().getFullYear()} Estety Cloud — Portal do Cliente</p>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.querySelector("#cancelBtn")?.addEventListener("click", () => { modal.remove(); reject(new Error("cancelado")); });
+      modal.querySelector("#confirmBtn")?.addEventListener("click", () => { modal.remove(); resolve(); });
+    });
   }
-
-  return new Promise<void>((resolve, reject) => {
-    const modal = document.createElement("div");
-    modal.className =
-      "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4";
-
-    modal.innerHTML = `
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center animate-fadeIn relative">
-        <h2 class="text-2xl font-semibold mb-2 text-[#9d8983]">Confirmação de Dados</h2>
-        <p class="text-gray-600 text-sm mb-6">
-          Antes de continuar, confirme se seus dados abaixo estão corretos. 
-          <br/>Essa verificação será exibida apenas <strong>uma única vez</strong> para este e-mail.
-        </p>
-
-        <div class="bg-gray-50 border rounded-xl text-left text-sm px-4 py-3 space-y-2 mb-6">
-          <div><strong>Nome:</strong> ${client?.name || "—"}</div>
-          <div><strong>Data de Nascimento:</strong> ${formatDate(client?.birthdate)}</div>
-          <div><strong>WhatsApp:</strong> ${formatPhone(client?.phone)}</div>
-          <div><strong>E-mail:</strong> ${client?.email || "—"}</div>
-        </div>
-
-        <div class="flex justify-center gap-3 mt-2">
-          <button id="cancelBtn"
-            class="px-4 py-2 rounded-lg border text-gray-600 hover:bg-gray-100 transition">
-            Cancelar
-          </button>
-          <button id="confirmBtn"
-            class="px-5 py-2 rounded-lg text-white font-medium shadow-md hover:opacity-90 transition"
-            style="background:#bca49d;border-color:#bca49d;">
-            Confirmar e continuar
-          </button>
-        </div>
-
-        <p class="text-[11px] text-gray-400 mt-5">
-          © ${new Date().getFullYear()} Estety Cloud — Portal do Cliente
-        </p>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    // Fecha modal
-    modal.querySelector("#cancelBtn")?.addEventListener("click", () => {
-      modal.remove();
-      reject(new Error("cancelado"));
-    });
-
-    modal.querySelector("#confirmBtn")?.addEventListener("click", () => {
-      modal.remove();
-      resolve();
-    });
-  });
-}
 
   /** inicializa o botão do Google quando o script carrega */
   function initGoogle() {
@@ -219,9 +302,7 @@ async function showConfirmModal(client: any) {
       // @ts-ignore
       window.google.accounts.id.initialize({
         client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        callback: (resp: any) => {
-          if (resp?.credential) onGoogleCredential(resp.credential);
-        },
+        callback: (resp: any) => { if (resp?.credential) onGoogleCredential(resp.credential); },
         auto_select: false,
         cancel_on_tap_outside: true,
         context: "signin",
@@ -241,11 +322,7 @@ async function showConfirmModal(client: any) {
   return (
     <main className="min-h-screen flex items-center justify-center">
       {/* GIS script */}
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-        onLoad={initGoogle}
-      />
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={initGoogle} />
 
       <div className="w-full max-w-sm">
         {/* Card */}
@@ -262,11 +339,16 @@ async function showConfirmModal(client: any) {
                 priority
               />
             </div>
-            <h1 className="text-lg font-semibold" style={{ color: "#9d8983" }}>
-              Estety Cloud
-            </h1>
+            <h1 className="text-lg font-semibold" style={{ color: "#9d8983" }}>Estety Cloud</h1>
             <p className="text-xs text-gray-500 mt-1">Portal do Cliente</p>
           </div>
+
+          {/* Aviso suave quando veio do Step2 */}
+          {info && (
+            <div className="mb-4 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "#fde68a", background: "#fff7ed", color: "#92400e" }}>
+              {info}
+            </div>
+          )}
 
           {/* Botão Google */}
           <div className="mb-4 flex justify-center">

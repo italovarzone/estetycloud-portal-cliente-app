@@ -145,15 +145,13 @@ export default function ProfilePage() {
   }, [cooldown]);
 
   const missingSteps = useMemo(() => {
-  if (!me) return [];
+    if (!me) return [];
 
-  const steps = [];
-  if (!me.emailVerified) steps.push("Verificação de e-mail pendente");
-  if (!me.birthdate) steps.push("Informar data de nascimento");
-  if (!me.phone) steps.push("Adicionar número de WhatsApp");
-
-  return steps;
-}, [me]);
+    const steps = [];
+    if (!me.birthdate) steps.push("Informar data de nascimento");
+    if (!me.phone) steps.push("Adicionar número de WhatsApp");
+    return steps;
+  }, [me]);
 
   function validateProfile() {
     if (!name) return "Informe seu nome.";

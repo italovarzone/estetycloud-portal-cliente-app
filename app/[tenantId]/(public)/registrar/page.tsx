@@ -86,6 +86,55 @@ export default function RegisterPage() {
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Falha ao registrar");
 
+      // se o backend retorna token direto no cadastro, salva e tenta finalizar pendente
+      if (data.token) {
+        localStorage.setItem("clientPortalToken", data.token);
+        localStorage.setItem("clientPortalTenant", String(tenantId));
+
+        try {
+          const pendingRaw = sessionStorage.getItem("pendingAppointment");
+          if (pendingRaw) {
+            const pending = JSON.parse(pendingRaw);
+            const token = localStorage.getItem("clientPortalToken") || "";
+            const url = pending.isEditing && pending.editId
+              ? `${API}/api/client-portal/appointments/${encodeURIComponent(String(pending.editId))}`
+              : `${API}/api/client-portal/appointments`;
+            const method = pending.isEditing ? "PUT" : "POST";
+
+            const r2 = await fetch(url, {
+              method,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                "x-tenant-id": pending.tenantId,
+              },
+              body: JSON.stringify(pending.payload),
+            });
+
+            const data2 = await r2.json().catch(() => ({}));
+            if (r2.ok) {
+              const total = pending.payload.procedures.reduce((s: number, p: any) => s + Number(p.price || 0), 0);
+              const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+              const summary = {
+                id: data2.id,
+                date: pending.payload.date,
+                time: pending.payload.time,
+                total: BRL.format(total),
+                procs: pending.payload.procedures.map((p: any) => p.name),
+              };
+              sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
+              sessionStorage.removeItem("pendingAppointment");
+              sessionStorage.setItem("bookedAfterLogin", "1");
+              router.replace(`/${tenantId}/novo-agendamento/sucesso`);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn("⚠️ Falha ao finalizar agendamento pendente após registro:", err);
+        }
+      }
+
+      // fallback: caso não haja token, ou pendente, segue fluxo padrão
       router.push(`/${tenantId}/verificar-email?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setError(err.message || "Falha ao registrar.");

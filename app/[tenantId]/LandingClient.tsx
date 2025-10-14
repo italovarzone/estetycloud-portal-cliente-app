@@ -67,7 +67,7 @@ export default function LandingClient({
             <span className="text-xl font-semibold tracking-wide">{data?.branding?.name || "Estety Cloud"}</span>
           </div>
           <Link
-            href={`/${tenantId}/home`}
+            href={`/${tenantId}/novo-agendamento`}
             className="px-5 py-2 rounded-xl border-2 text-sm font-medium hover:scale-105 transition-transform"
             style={{ borderColor: brandColor, color: brandColor }}
           >
@@ -96,7 +96,7 @@ export default function LandingClient({
             </p>
           )}
           <Link
-            href={`/${tenantId}/home`}
+            href={`/${tenantId}/novo-agendamento`}
             className="mt-8 inline-block px-8 py-3 rounded-full text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all"
             style={{ background: brandColor }}
           >

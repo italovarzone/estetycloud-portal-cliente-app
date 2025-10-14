@@ -269,7 +269,8 @@ export default function Step2Schedule({
         setPickedTime("");
 
         const token = localStorage.getItem("clientPortalToken") || "";
-        const headers = { Authorization: `Bearer ${token}`, "x-tenant-id": tenantId } as any;
+        const headers: any = { "x-tenant-id": tenantId };
+        if (token) headers.Authorization = `Bearer ${token}`;
 
         const [sched, apps] = await Promise.all([
           fetch(`${apiBase()}/api/client-portal/schedule/detailed?date=${encodeURIComponent(selectedDate)}`, { headers })
@@ -509,6 +510,18 @@ export default function Step2Schedule({
         time: pickedTime,
         procedures: selectedProcedures.map((p) => ({ _id: p._id, name: p.name, price: p.price })),
       };
+
+      
+      if (!token) {
+        // visitante: salva tentativa e manda pro login
+        const next = `/${tenantId}/novo-agendamento/sucesso`; // pós-login vamos finalizar e cair aqui
+        const params = new URLSearchParams({ next, pending: "1" });
+        const { savePending } = await import("../../../lib/pendingBooking");
+        savePending({ tenantId: String(tenantId), payload, isEditing, editId });
+        sessionStorage.setItem("loginMessage", "Entre para finalizar seu agendamento.");
+        router.push(`/${tenantId}/login?${params.toString()}`);
+        return;
+      }
 
       const url = isEditing
         ? `${apiBase()}/api/client-portal/appointments/${encodeURIComponent(String(editId!))}`

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Step1Procedures from "./Step1Procedures";
-import Step2Schedule from "./Step2Schedule";
+import Step1 from "../../(protected)/novo-agendamento/Step1Procedures";   // reaproveita
+import Step2 from "../../(protected)/novo-agendamento/Step2Schedule";    // reaproveita
 
 export default function NovoAgendamentoPage() {
   const [step, setStep] = useState(1);
@@ -12,7 +12,7 @@ export default function NovoAgendamentoPage() {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-5">
       {step === 1 && (
-        <Step1Procedures
+        <Step1
           cart={selProcedures}
           onNext={(list) => {
             setSelProcedures(list);
@@ -22,7 +22,7 @@ export default function NovoAgendamentoPage() {
       )}
 
       {step === 2 && (
-        <Step2Schedule
+        <Step2
           selectedProcedures={selProcedures}
           onBack={() => setStep(1)}
           onNext={({ date, time }) => {

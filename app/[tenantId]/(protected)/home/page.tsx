@@ -99,15 +99,16 @@ export default function HomePage() {
     })();
   }, [router, tenantId]);
 
-  const isProfileComplete = useMemo(() => {
-    if (!me) return false;
-    const hasName = !!String(me.name || "").trim();
-    const hasEmail = !!String(me.email || "").trim();
-    const hasBirth = !!String(me.birthdate || "").trim();
-    const phoneDigits = onlyDigits(me.phone || "");
-    const hasPhone = phoneDigits.length >= 10;
-    return hasName && hasEmail && me.emailVerified === true && hasBirth && hasPhone;
-  }, [me]);
+    // 🔸 remove a obrigatoriedade de e-mail verificado
+    const isProfileComplete = useMemo(() => {
+      if (!me) return false;
+      const hasName = !!String(me.name || "").trim();
+      const hasEmail = !!String(me.email || "").trim();
+      const hasBirth = !!String(me.birthdate || "").trim();
+      const phoneDigits = onlyDigits(me.phone || "");
+      const hasPhone = phoneDigits.length >= 10;
+      return hasName && hasEmail && hasBirth && hasPhone;
+    }, [me]);
 
   function go(path: string) {
     router.push(`/${tenantId}${path}`);

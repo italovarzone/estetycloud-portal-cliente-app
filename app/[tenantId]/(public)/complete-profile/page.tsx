@@ -135,14 +135,57 @@ export default function CompleteProfilePage() {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Falha ao completar perfil.");
 
-      // se vier token novo (caso preToken), persiste e limpa os itens de sessão
       if (data.token) {
         localStorage.setItem("clientPortalToken", data.token);
         localStorage.setItem("clientPortalTenant", String(tenantId));
         sessionStorage.removeItem("clientPortalPreToken");
         sessionStorage.removeItem("clientPortalPreName");
+
+        // ✅ tenta finalizar agendamento pendente (igual ao login)
+        try {
+          const pendingRaw = sessionStorage.getItem("pendingAppointment");
+          if (pendingRaw) {
+            const pending = JSON.parse(pendingRaw);
+            const url = pending.isEditing && pending.editId
+              ? `${API}/api/client-portal/appointments/${encodeURIComponent(String(pending.editId))}`
+              : `${API}/api/client-portal/appointments`;
+            const method = pending.isEditing ? "PUT" : "POST";
+
+            const token = localStorage.getItem("clientPortalToken") || "";
+            const r = await fetch(url, {
+              method,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                "x-tenant-id": pending.tenantId,
+              },
+              body: JSON.stringify(pending.payload),
+            });
+
+            const dataRes = await r.json().catch(() => ({}));
+            if (r.ok) {
+              const total = pending.payload.procedures.reduce((s: number, p: any) => s + Number(p.price || 0), 0);
+              const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+              const summary = {
+                id: dataRes.id,
+                date: pending.payload.date,
+                time: pending.payload.time,
+                total: BRL.format(total),
+                procs: pending.payload.procedures.map((p: any) => p.name),
+              };
+              sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
+              sessionStorage.removeItem("pendingAppointment");
+              sessionStorage.setItem("bookedAfterLogin", "1");
+              router.replace(`/${tenantId}/novo-agendamento/sucesso`);
+              return; // sai da função aqui
+            }
+          }
+        } catch (err) {
+          console.warn("⚠️ Falha ao finalizar agendamento pendente:", err);
+        }
       }
 
+      // caso não haja pendente ou falha, segue pro home normalmente
       router.replace(`/${tenantId}/home`);
     } catch (e: any) {
       setError(e.message || "Erro inesperado.");
