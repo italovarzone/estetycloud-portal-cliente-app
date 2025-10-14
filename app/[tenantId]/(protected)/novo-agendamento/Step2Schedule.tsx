@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import StepProgress from "../components/StepProgress";
+import { useScrollIdle } from "../../../hooks/useScrollIdle";
 
 /* ===== helpers ===== */
 const STEP_MIN = 30;
@@ -165,6 +166,9 @@ export default function Step2Schedule({
   const [restrictionInfo, setRestrictionInfo] = useState<{ name: string; days: number } | null>(() =>
     restrictName && restrictDays ? { name: decodeURIComponent(restrictName), days: restrictDays } : null
   );
+
+  const isIdle = useScrollIdle(2000);
+  const showBar = pickedTime && isIdle; // só mostra se tiver horário escolhido e scroll parado
 
   const [allowedWeek, setAllowedWeek] =
     useState<{ start: string; end: string } | null>(null);
@@ -840,7 +844,11 @@ export default function Step2Schedule({
       {saveError && <div className="text-sm text-red-600">{saveError}</div>}
 
       {/* Barra fixa inferior */}
-      <div className="fixed inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t">
+      <div
+        className={`fixed inset-x-0 bottom-0 transition-all duration-500 transform ${
+          showBar ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
+        } bg-white/95 backdrop-blur border-t`}
+      >
         <div className="mx-auto w-full max-w-md p-4 space-y-2">
           <div className="text-xs text-gray-600">
             <span className="font-medium">{selectedSummary.count}</span> procedimento(s) •{" "}

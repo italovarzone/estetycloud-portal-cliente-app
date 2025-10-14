@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import StepProgress from "../components/StepProgress";
+import { useScrollIdle } from "../../../hooks/useScrollIdle";
 
 function apiBase() {
   return (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
@@ -56,6 +57,8 @@ export default function Step1Procedures({
 
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set()); // IDs de procedimentos já concluídos
   const [restrictionInfo, setRestrictionInfo] = useState<{ name: string; days: number } | null>(null);
+
+  const isIdle = useScrollIdle(2000);
 
   // snapshot do agendamento em edição (vindo da listagem/meus-agendamentos)
   const [editingAppt, setEditingAppt] = useState<any>(null);
@@ -330,6 +333,7 @@ export default function Step1Procedures({
 
     const disabled = isRestrictedSelected || disabledByRestriction;
 
+    
     return (
       <button
         key={id}
@@ -428,7 +432,9 @@ export default function Step1Procedures({
       )}
 
       {/* Barra fixa inferior com resumo + ações */}
-      <div className="fixed inset-x-0 bottom-0 bg-white/95 backdrop-blur border-t">
+      <div className={`fixed inset-x-0 bottom-0 transition-all duration-500 transform ${
+          isIdle ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
+        } bg-white/95 backdrop-blur border-t`}>
         <div className="mx-auto w-full max-w-md p-4">
           <div className="flex items-center justify-between mb-3 text-sm">
             <div className="text-gray-600">
