@@ -6,6 +6,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import { headers } from "next/headers";
+
+function absoluteBaseUrl() {
+  const h = headers();
+  const host = h.get("x-forwarded-host") || h.get("host");
+  const proto = h.get("x-forwarded-proto") || "https";
+  return `${proto}://${host}`;
+}
+
 // nomes reservados que não são tenants
 const RESERVED = new Set([
   "favicon.ico", "icon.png", "apple-touch-icon.png",
@@ -31,10 +40,8 @@ export default async function TenantLanding({
   const company = await res.json();
 
   // agora obtem o CMS com base no tenantId real
-  const cmsRes = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/cms/${company.tenantId}`,
-    { cache: "no-store" }
-  );
+  const base = absoluteBaseUrl();
+  const cmsRes = await fetch(`${base}/api/cms/${company.tenantId}`, { cache: "no-store" });
 
   if (!cmsRes.ok) {
     console.log(cmsRes);
