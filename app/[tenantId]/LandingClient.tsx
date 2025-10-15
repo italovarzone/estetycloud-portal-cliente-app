@@ -76,7 +76,7 @@ export default function LandingClient({
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* HERO
       <header className="relative overflow-hidden">
         {data?.hero?.cover && (
           <img
@@ -103,13 +103,13 @@ export default function LandingClient({
             Agende Agora
           </Link>
         </div>
-      </header>
+      </header> */}
 
       {/* SERVIÇOS */}
       {!!data?.services?.length && (
-        <section className="max-w-7xl mx-auto px-4 py-20">
+        <section className="max-w-7xl mx-auto px-4 py-12">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 animate-fadeIn">
-            Nossos Serviços
+            Confira todos os nossos serviços
           </h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {data.services!.map((s, i) => (
@@ -139,7 +139,7 @@ export default function LandingClient({
 
       {/* GALERIA */}
       {!!data?.gallery?.length && (
-        <section className="bg-gradient-to-b from-white to-gray-50 py-20">
+        <section className="bg-gradient-to-b from-white to-gray-50">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-3xl font-bold">Resultados</h2>
@@ -173,37 +173,60 @@ export default function LandingClient({
       )}
 
       {/* SOBRE 1 */}
-      {(data?.about?.photo1 || data?.about?.text) && (
-        <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
-          <div className="animate-slideLeft">
-            <img
-              src={data.about?.photo1}
-              alt="Sobre"
-              className="w-full rounded-3xl shadow-xl object-cover"
-            />
-          </div>
-          <div className="animate-slideRight">
-            <h2 className="text-3xl font-bold mb-4">{data.about?.title || "Sobre Nós"}</h2>
-            <p className="text-gray-700 leading-relaxed">{data.about?.text}</p>
-          </div>
-        </section>
-      )}
+      {(data?.about?.photo1 || data?.about?.photo2 || data?.about?.text) && (
+        <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-3 gap-12 items-center">
+          
+          {/* FOTO 1 */}
+          {data.about?.photo1 && (
+            <div
+              className="animate-slideLeft cursor-pointer hover:scale-105 transition-transform duration-300"
+              onClick={() => setLightbox({ src: data.about.photo1 })}
+            >
+              <img
+                src={data.about.photo1}
+                alt="Sobre"
+                className="w-full rounded-3xl shadow-xl object-cover"
+              />
+            </div>
+          )}
 
-      {/* SOBRE 2 */}
-      {(data?.about?.photo2) && (
-        <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
-          <div className="animate-slideLeft">
-            <img
-              src={data.about?.photo2}
-              alt="Sobre"
-              className="w-full rounded-3xl shadow-xl object-cover"
-            />
+          {/* FOTO 2 */}
+          {data.about?.photo2 && (
+            <div
+              className="animate-slideLeft cursor-pointer hover:scale-105 transition-transform duration-300"
+              onClick={() => setLightbox({ src: data.about.photo2 })}
+            >
+              <img
+                src={data.about.photo2}
+                alt="Sobre"
+                className="w-full rounded-3xl shadow-xl object-cover"
+              />
+            </div>
+          )}
+
+          {/* TEXTO CENTRAL */}
+          <div className="w-full flex flex-col items-center text-center justify-center animate-slideRight">
+            <h2 className="text-3xl font-bold mb-6">
+              {data.about?.title || "Sobre Nós"}
+            </h2>
+
+            {Array.isArray(data.about?.text) ? (
+              data.about.text.map((t, i) => (
+                <p key={i} className="text-gray-700 leading-relaxed mb-4 max-w-2xl">
+                  {t}
+                </p>
+              ))
+            ) : (
+              <p className="text-gray-700 leading-relaxed max-w-2xl">
+                {data.about?.text}
+              </p>
+            )}
           </div>
         </section>
       )}
 
       {/* FOOTER */}
-      <footer className="bg-[#1D1411] text-white mt-20">
+      <footer className="bg-[#1D1411] text-white">
         <div className="max-w-7xl mx-auto px-4 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <h4 className="font-semibold mb-3 text-lg">Contato</h4>

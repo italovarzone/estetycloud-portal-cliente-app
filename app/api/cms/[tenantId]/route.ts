@@ -104,7 +104,8 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
     about: {
       title: cfg?.about?.title,
       text: cfg?.about?.text,
-      photo: abs(cfg?.about?.photo),
+      photo1: abs(cfg?.about?.photo1),
+      photo2: abs(cfg?.about?.photo2),
     },
     contact: cfg?.contact ?? {},
     testimonials: cfg?.testimonials ?? [],
