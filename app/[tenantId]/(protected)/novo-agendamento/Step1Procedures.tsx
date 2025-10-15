@@ -58,7 +58,7 @@ export default function Step1Procedures({
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set()); // IDs de procedimentos já concluídos
   const [restrictionInfo, setRestrictionInfo] = useState<{ name: string; days: number } | null>(null);
 
-  const isIdle = useScrollIdle(2000);
+  const isIdle = useScrollIdle(1000);
 
   // snapshot do agendamento em edição (vindo da listagem/meus-agendamentos)
   const [editingAppt, setEditingAppt] = useState<any>(null);

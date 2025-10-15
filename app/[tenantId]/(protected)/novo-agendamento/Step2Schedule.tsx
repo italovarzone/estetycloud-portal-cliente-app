@@ -167,7 +167,7 @@ export default function Step2Schedule({
     restrictName && restrictDays ? { name: decodeURIComponent(restrictName), days: restrictDays } : null
   );
 
-  const isIdle = useScrollIdle(2000);
+  const isIdle = useScrollIdle(1000);
   const showBar = pickedTime && isIdle; // só mostra se tiver horário escolhido e scroll parado
 
   const [allowedWeek, setAllowedWeek] =
