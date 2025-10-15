@@ -8,7 +8,7 @@ type Cms = {
   hero?: { title?: string; subtitle?: string; cover?: string };
   services?: { title: string; desc?: string; price?: string; image?: string }[];
   gallery?: { image: string; caption?: string }[];
-  about?: { title?: string; text?: string; photo?: string };
+  about?: { title?: string; text?: string; photo1?: string; photo2?: string };
   contact?: { instagram?: string; whatsapp?: string; address?: string };
   testimonials?: { name: string; text: string; photo?: string }[];
   faq?: { question: string; answer: string }[];
@@ -173,14 +173,21 @@ export default function LandingClient({
       )}
 
       {/* SOBRE */}
-      {(data?.about?.photo || data?.about?.text) && (
+      {(data?.about?.photo1 || data?.about?.photo2 || data?.about?.text) && (
         <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
           <div className="animate-slideLeft">
             <img
-              src={data.about?.photo}
+              src={data.about?.photo1}
               alt="Sobre"
               className="w-full rounded-3xl shadow-xl object-cover"
             />
+            {data.about?.photo2 && (
+              <img
+                src={data.about.photo2}
+                alt="Sobre"
+                className="w-full rounded-3xl shadow-xl object-cover"
+              />
+            )}
           </div>
           <div className="animate-slideRight">
             <h2 className="text-3xl font-bold mb-4">{data.about?.title || "Sobre Nós"}</h2>
