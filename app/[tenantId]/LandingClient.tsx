@@ -172,8 +172,8 @@ export default function LandingClient({
         </section>
       )}
 
-      {/* SOBRE */}
-      {(data?.about?.photo1 || data?.about?.photo2 || data?.about?.text) && (
+      {/* SOBRE 1 */}
+      {(data?.about?.photo1 || data?.about?.text) && (
         <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
           <div className="animate-slideLeft">
             <img
@@ -181,17 +181,23 @@ export default function LandingClient({
               alt="Sobre"
               className="w-full rounded-3xl shadow-xl object-cover"
             />
-            {data.about?.photo2 && (
-              <img
-                src={data.about.photo2}
-                alt="Sobre"
-                className="w-full rounded-3xl shadow-xl object-cover"
-              />
-            )}
           </div>
           <div className="animate-slideRight">
             <h2 className="text-3xl font-bold mb-4">{data.about?.title || "Sobre Nós"}</h2>
             <p className="text-gray-700 leading-relaxed">{data.about?.text}</p>
+          </div>
+        </section>
+      )}
+
+      {/* SOBRE 2 */}
+      {(data?.about?.photo2) && (
+        <section className="max-w-7xl mx-auto px-4 py-20 grid md:grid-cols-2 gap-12 items-center">
+          <div className="animate-slideLeft">
+            <img
+              src={data.about?.photo2}
+              alt="Sobre"
+              className="w-full rounded-3xl shadow-xl object-cover"
+            />
           </div>
         </section>
       )}
