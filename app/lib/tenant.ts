@@ -24,9 +24,7 @@ export async function ensureTenantLoaded() {
       return null;
     }
 
-    // 3️⃣ fetch deve ser absoluto no ambiente client
-    const base = window.location.origin;
-    const url = `${base}/api/company/by-slug/${slug}`;
+    const url = `${process.env.CONFIG_SERVICE_BASE}/api/company/by-slug/${slug}`;
 
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
