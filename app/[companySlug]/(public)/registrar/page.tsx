@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000";
 
@@ -17,7 +18,23 @@ function onlyDigits(s: string) {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
 
   const [name, setName] = useState("");
   const [birthdate, setBirthdate] = useState(""); // dd/MM/AAAA
@@ -68,7 +85,7 @@ export default function RegisterPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify({ name, birthdate, phone: phoneMasked, email, password, confirmPassword }),
       });
@@ -125,7 +142,7 @@ export default function RegisterPage() {
               sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
               sessionStorage.removeItem("pendingAppointment");
               sessionStorage.setItem("bookedAfterLogin", "1");
-              router.replace(`/${tenantId}/novo-agendamento/sucesso`);
+              router.replace(`/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`);
               return;
             }
           }
@@ -135,7 +152,7 @@ export default function RegisterPage() {
       }
 
       // fallback: caso não haja token, ou pendente, segue fluxo padrão
-      router.push(`/${tenantId}/verificar-email?email=${encodeURIComponent(email)}`);
+      router.push(`/${localStorage.getItem("tenantSlug")}/verificar-email?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setError(err.message || "Falha ao registrar.");
     } finally {
@@ -233,7 +250,7 @@ export default function RegisterPage() {
                   Este e-mail já está cadastrado.{" "}
                   <button
                     type="button"
-                    onClick={() => router.push(`/${tenantId}/login`)}
+                    onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/login`)}
                     className="underline"
                     style={{ color: "#b91c1c" }}
                   >

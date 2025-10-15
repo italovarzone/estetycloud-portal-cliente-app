@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Script from "next/script";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
 
@@ -99,8 +100,8 @@ async function finalizePendingAfterLogin(tenantId: string): Promise<string | nul
 
     // rota de sucesso
     return pending.isEditing
-      ? `/${tenantId}/novo-agendamento/sucesso?edit=1`
-      : `/${tenantId}/novo-agendamento/sucesso`;
+      ? `/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso?edit=1`
+      : `/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`;
   } catch (e) {
     // se falhar, mantemos o pendente (TTL cuida); segue fluxo normal
     console.warn("⚠️ Falha ao finalizar pendente:", e);
@@ -110,7 +111,23 @@ async function finalizePendingAfterLogin(tenantId: string): Promise<string | nul
 
 export default function LoginPage() {
   const router = useRouter();
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -137,12 +154,18 @@ export default function LoginPage() {
     if (tenantId && next.startsWith(`/${tenantId}`)) {
       next = next.slice(tenantId.length + 1) || "/home";
     }
-    return `/${tenantId}${next}`;
+    return `/${localStorage.getItem("tenantSlug")}${next}`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    const id = tenantId || localStorage.getItem("tenantId");
+    if (!id) {
+      setError("Tenant não encontrado. Recarregue a página.");
+      return;
+    }
 
     if (email && !/^([^\s@]+)@([^\s@]+)\.[^\s@]+$/.test(email)) {
       setError("Email inválido.");
@@ -159,18 +182,18 @@ export default function LoginPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || "").trim(),
+          "x-tenant-id": id,
         },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Falha no login.");
 
       localStorage.setItem("clientPortalToken", data.token);
-      localStorage.setItem("clientPortalTenant", String(tenantId));
+      localStorage.setItem("clientPortalTenant", id);
 
-      // 👇 tenta finalizar um agendamento pendente
-      const successRoute = await finalizePendingAfterLogin(String(tenantId));
+      const successRoute = await finalizePendingAfterLogin(id);
       router.replace(successRoute || resolveNext());
     } catch (err: any) {
       setError(err.message || "Falha no login.");
@@ -229,7 +252,7 @@ export default function LoginPage() {
       // 🚀 NOVO CLIENTE → completar perfil
       if (data.preToken && !data.existing) {
         sessionStorage.setItem("clientPortalPreToken", data.preToken);
-        router.replace(`/${tenantId}/complete-profile`);
+        router.replace(`/${localStorage.getItem("tenantSlug")}/complete-profile`);
         return;
       }
 
@@ -451,7 +474,7 @@ export default function LoginPage() {
             Não tem conta?{" "}
             <button
               type="button"
-              onClick={() => router.push(`/${tenantId}/registrar`)}
+              onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/registrar`)}
               className="text-brand hover:underline"
               style={{ color: "#9d8983" }}
             >

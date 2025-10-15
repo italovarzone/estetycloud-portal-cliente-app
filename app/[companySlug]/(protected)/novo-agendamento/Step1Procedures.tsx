@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import StepProgress from "../components/StepProgress";
 import { useScrollIdle } from "../../../hooks/useScrollIdle";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 function apiBase() {
   return (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
@@ -44,7 +45,24 @@ export default function Step1Procedures({
   onNext: (list: Proc[]) => void;
 }) {
   const router = useRouter();
-  const { tenantId } = useParams();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+
   const search = useSearchParams();
   const editId = search.get("edit");
 
@@ -83,7 +101,7 @@ export default function Step1Procedures({
     async function load() {
       try {
         const token = localStorage.getItem("clientPortalToken") || "";
-        const headers: any = { "x-tenant-id": String(tenantId || "") };
+        const headers: any = { "x-tenant-id": tenantId };
         if (token) headers.Authorization = `Bearer ${token}`;
 
         // 1) Todos os procedimentos ativos
@@ -297,7 +315,7 @@ export default function Step1Procedures({
     cleanUrl.searchParams.delete("restrictName");
     cleanUrl.searchParams.delete("restrictDays");
     window.history.replaceState({}, "", cleanUrl);
-    router.push(`/${tenantId}/home`);
+    router.push(`/${localStorage.getItem("tenantSlug")}/home`);
   }
 
   if (loading) return <div>Carregando procedimentos...</div>;

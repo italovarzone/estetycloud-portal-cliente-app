@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
 
@@ -24,7 +25,24 @@ function isValidBirthBR(v?: string) {
 }
 
 export default function CompleteProfilePage() {
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -52,7 +70,7 @@ export default function CompleteProfilePage() {
           const r = await fetch(`${API}/api/client-portal/profile/status`, {
             headers: {
               Authorization: `Bearer ${bearer}`,
-              "x-tenant-id": String(tenantId || ""),
+              "x-tenant-id": tenantId,
             },
             cache: "no-store",
           });
@@ -60,7 +78,7 @@ export default function CompleteProfilePage() {
           if (!r.ok) throw new Error(data?.error || "Falha ao consultar perfil.");
 
           if (data.needsProfile === false) {
-            router.replace(`/${tenantId}/home`);
+            router.replace(`/${localStorage.getItem("tenantSlug")}/home`);
             return;
           }
           if (data?.profile?.name) setName(String(data.profile.name));
@@ -70,7 +88,7 @@ export default function CompleteProfilePage() {
           // (opcional) se houver phone/name guardados do passo anterior, já estão setados
         } else {
           // sem Bearer e sem preToken -> sessão inválida
-          router.replace(`/${tenantId}/login`);
+          router.replace(`/${localStorage.getItem("tenantSlug")}/login`);
           return;
         }
       } catch (e: any) {
@@ -108,7 +126,7 @@ export default function CompleteProfilePage() {
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "x-tenant-id": String(tenantId || ""),
+        "x-tenant-id": tenantId,
       };
 
       const body: any = {
@@ -176,7 +194,7 @@ export default function CompleteProfilePage() {
               sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
               sessionStorage.removeItem("pendingAppointment");
               sessionStorage.setItem("bookedAfterLogin", "1");
-              router.replace(`/${tenantId}/novo-agendamento/sucesso`);
+              router.replace(`/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`);
               return; // sai da função aqui
             }
           }
@@ -186,7 +204,7 @@ export default function CompleteProfilePage() {
       }
 
       // caso não haja pendente ou falha, segue pro home normalmente
-      router.replace(`/${tenantId}/home`);
+      router.replace(`/${localStorage.getItem("tenantSlug")}/home`);
     } catch (e: any) {
       setError(e.message || "Erro inesperado.");
     } finally {

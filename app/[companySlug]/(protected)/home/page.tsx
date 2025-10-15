@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000";
 
@@ -55,7 +56,23 @@ function SkeletonSideCard() {
 
 export default function HomePage() {
   const router = useRouter();
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
 
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,41 +80,55 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("clientPortalToken");
-    if (!token) {
-      router.replace(`/${tenantId}/login`);
-      return;
-    }
-    (async () => {
-      try {
-        setLoading(true);
-        const r = await fetch(`${API}/api/client-portal/me`, {
-          headers: {
-            "Content-Type": "application/json",
-            "x-tenant-id": String(tenantId || ""),
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error || "Falha ao carregar");
+useEffect(() => {
+  const token = localStorage.getItem("clientPortalToken");
+  const slug = localStorage.getItem("tenantSlug") || "";
+  const id = tenantId || localStorage.getItem("tenantId");
 
-        setMe({
-          id: data.id,
-          name: data.name,
-          email: data.email ?? null,
-          birthdate: data.birthdate ?? null,
-          phone: data.phone ?? null,
-          emailVerified: !!data.emailVerified,
-          picture: data.picture ?? null,
-        });
-      } catch (err: any) {
-        setError(err.message || "Falha ao carregar");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [router, tenantId]);
+  // Sem token → volta pro login
+  if (!token) {
+    router.replace(`/${slug}/login`);
+    return;
+  }
+
+  // Aguarda tenantId carregado
+  if (!id) {
+    console.warn("⏳ Aguardando tenantId para buscar /me...");
+    return;
+  }
+
+  (async () => {
+    try {
+      setLoading(true);
+      console.log("🔹 Buscando /me com tenant:", id);
+      const r = await fetch(`${API}/api/client-portal/me`, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": id,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Falha ao carregar perfil.");
+
+      setMe({
+        id: data.id,
+        name: data.name,
+        email: data.email ?? null,
+        birthdate: data.birthdate ?? null,
+        phone: data.phone ?? null,
+        emailVerified: !!data.emailVerified,
+        picture: data.picture ?? null,
+      });
+    } catch (err: any) {
+      console.error("❌ Erro ao buscar /me:", err);
+      setError(err.message || "Falha ao carregar perfil.");
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [tenantId]); // 🔥 dispara novamente assim que tenantId mudar
 
     // 🔸 remove a obrigatoriedade de e-mail verificado
     const isProfileComplete = useMemo(() => {
@@ -111,7 +142,7 @@ export default function HomePage() {
     }, [me]);
 
   function go(path: string) {
-    router.push(`/${tenantId}${path}`);
+    router.push(`/${localStorage.getItem("tenantSlug")}${path}`);
   }
 
   function handleLogout() {
@@ -119,7 +150,7 @@ export default function HomePage() {
       localStorage.removeItem("clientPortalToken");
       localStorage.removeItem("clientPortalTenant");
     } catch {}
-    router.replace(`/${tenantId}/login`);
+    router.replace(`/${localStorage.getItem("tenantSlug")}/login`);
   }
 
   useEffect(() => {

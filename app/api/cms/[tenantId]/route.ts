@@ -1,4 +1,3 @@
-// app/api/cms/[tenantId]/route.ts
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -10,7 +9,17 @@ const REPO  = process.env.CMS_GH_REPO!;
 const REF   = process.env.CMS_GH_REF || "main";
 
 /**
- * Pega o último commit hash da branch REF (ex: "main")
+ * Mapa de tenantId → nome da pasta do CMS (slug)
+ */
+const TENANT_FOLDER_MAP: Record<string, string> = {
+  "05616ffe-33bc-4f88-b6f5-b43ab3a0a759": "ipv-desenv",
+  "187a677b-7d9f-490a-8622-aa131966697c": "livia-moraes",
+  "3b5bfc29-2400-41d9-8546-cdc7c4d7f353": "esl",
+  "53a60676-fe12-42ba-88c3-0c1ac9fa1189": "tckc",
+};
+
+/**
+ * Resolve o commit hash da branch principal
  */
 async function resolveCommitSha(): Promise<string> {
   try {
@@ -29,13 +38,15 @@ async function resolveCommitSha(): Promise<string> {
     return json.sha;
   } catch (err) {
     console.error("[CMS] Falha ao buscar commit:", err);
-    // fallback: usa REF direto (ex: "main")
     return REF;
   }
 }
 
-function makeBases(tenantId: string, ref: string) {
-  const root = `tenants/${tenantId}`;
+/**
+ * Gera URLs possíveis (CDN + RAW)
+ */
+function makeBases(folder: string, ref: string) {
+  const root = `tenants/${folder}`;
   return [
     {
       name: "jsdelivr",
@@ -57,15 +68,21 @@ function makeBases(tenantId: string, ref: string) {
 export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
   const { tenantId } = params;
 
-  // resolve o commit hash mais recente
-  const commitSha = await resolveCommitSha();
-  const attempts = makeBases(tenantId, commitSha);
+  // 🔍 traduz tenantId → nome da pasta
+  const folder = TENANT_FOLDER_MAP[tenantId] ?? tenantId;
+
+  const commitSha = "main";
+  const attempts = makeBases(folder, commitSha);
 
   let cfg: any | null = null;
   let assetBase: ((f: string) => string) | null = null;
 
+  // tenta buscar o landing.json nas bases
   for (const b of attempts) {
+    debugger;
+    console.log("[CMS] Tentando URL:", b.cfg);
     const res = await fetch(b.cfg, { cache: "no-store" });
+    console.log("[CMS] Status:", res.status);
     if (!res.ok) continue;
     cfg = await b.parse(res);
     assetBase = b.asset;
@@ -74,7 +91,7 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
 
   if (!cfg || !assetBase) {
     return NextResponse.json(
-      { ok: false, error: "landing.json não encontrado" },
+      { ok: false, error: `landing.json não encontrado para tenantId ${tenantId} (pasta: ${folder})` },
       { status: 404 }
     );
   }
@@ -85,6 +102,7 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
   return NextResponse.json({
     ok: true,
     tenantId,
+    folder,
     branding: cfg.branding ?? { name: "Estúdio", primaryColor: "#bca49d" },
     hero: {
       title: cfg?.hero?.title ?? "",

@@ -101,7 +101,7 @@ export default function SuccessPage() {
         )}
         <div className="pt-2">
           <button
-            onClick={() => router.push(`/${tenantId}/meus-agendamentos`)}
+            onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/meus-agendamentos`)}
             className="w-full rounded-xl border py-3 font-medium bg-white hover:bg-gray-50"
             style={{ borderColor: "#bca49d", color: "#9d8983" }}
           >

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ensureTenantLoaded } from "../../lib/tenant";
 
 function apiBase() {
   return (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000").replace(/\/$/, "");
@@ -9,7 +10,24 @@ function apiBase() {
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { tenantId } = useParams() as { tenantId: string };
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
@@ -28,10 +46,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const search = typeof window !== "undefined" ? window.location.search : "";
 
         // tira o /{tenantId} do começo → fica só o caminho interno do tenant
-        const pathWithinTenant = pathname.replace(new RegExp(`^/${tenantId}(?=/|$)`), "") || "/home";
+        const pathWithinTenant = pathname.replace(new RegExp(`^/${localStorage.getItem("tenantSlug")}(?=/|$)`), "") || "/home";
         const nextParam = `${pathWithinTenant}${search}`;
 
-        router.replace(`/${tenantId}/login?next=${encodeURIComponent(nextParam)}`);
+        router.replace(`/${localStorage.getItem("tenantSlug")}/login?next=${encodeURIComponent(nextParam)}`);
         return;
       }
 
@@ -44,7 +62,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         if (!cancelled) setOk(true);
       } catch {
         localStorage.removeItem("clientPortalToken");
-        router.replace(`/${tenantId}/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+        router.replace(`/${localStorage.getItem("tenantSlug")}/login?next=${encodeURIComponent(location.pathname + location.search)}`);
       }
     }
 

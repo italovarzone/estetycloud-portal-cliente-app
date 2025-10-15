@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000";
 
@@ -12,7 +13,30 @@ function isValidEmail(e: string) {
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const { tenantId } = useParams<{ tenantId: string }>();
+
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+
+  useEffect(() => {
+    const id = localStorage.getItem("tenantId");
+    if (id) setTenantId(id);
+  }, []);
+
   const search = useSearchParams();
 
   const emailFromUrl = search.get("email") || "";
@@ -58,7 +82,7 @@ export default function VerifyEmailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify({ email, code }),
       });
@@ -104,7 +128,7 @@ export default function VerifyEmailPage() {
               sessionStorage.setItem("lastCreatedAppointment", JSON.stringify(summary));
               sessionStorage.removeItem("pendingAppointment");
               sessionStorage.setItem("bookedAfterLogin", "1");
-              router.replace(`/${tenantId}/novo-agendamento/sucesso`);
+              router.replace(`/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`);
               return;
             }
           }
@@ -114,7 +138,7 @@ export default function VerifyEmailPage() {
       }
 
       // fallback padrão: caso não haja pendente ou falha
-      router.push(`/${tenantId}/home`);
+      router.push(`/${localStorage.getItem("tenantSlug")}/home`);
     } catch (err: any) {
       setError(err?.message || "Falha ao verificar e-mail.");
     } finally {
@@ -260,7 +284,7 @@ export default function VerifyEmailPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/${tenantId}/login`)}
+              onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/login`)}
               className="text-xs text-gray-500 hover:underline"
             >
               Verificar depois, faça o login.

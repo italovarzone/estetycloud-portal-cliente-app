@@ -75,7 +75,7 @@ export default function MeusAgendamentos() {
         setError("");
         const token = localStorage.getItem("clientPortalToken");
         if (!token) {
-          router.replace(`/${tenantId}/login`);
+          router.replace(`/${localStorage.getItem("tenantSlug")}/login`);
           return;
         }
         const r = await fetch(`${apiBase()}/api/client-portal/appointments/history`, {
@@ -150,7 +150,7 @@ export default function MeusAgendamentos() {
       };
       sessionStorage.setItem("editAppointment", JSON.stringify(payload));
     } catch {}
-    router.push(`/${tenantId}/novo-agendamento?edit=${encodeURIComponent(ap._id)}`);
+    router.push(`/${localStorage.getItem("tenantSlug")}/novo-agendamento?edit=${encodeURIComponent(ap._id)}`);
   }
 
   // ===== CANCELAR (modal + chamada) =====
@@ -344,7 +344,7 @@ export default function MeusAgendamentos() {
       {/* Voltar */}
       <div className="pt-4">
         <button
-          onClick={() => router.push(`/${tenantId}/home`)}
+          onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/home`)}
           className="w-full max-w-xs mx-auto block rounded-xl border py-3 font-medium bg-white hover:bg-gray-50"
           style={{ borderColor: "#bca49d", color: "#9d8983" }}
         >

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import StepProgress from "../components/StepProgress";
 import { useScrollIdle } from "../../../hooks/useScrollIdle";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 /* ===== helpers ===== */
 const STEP_MIN = 30;
@@ -105,7 +106,24 @@ export default function Step2Schedule({
   selectedProcedures: ProcPick[];
   onBack: () => void;
 }) {
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+  
   const router = useRouter();
   const search = useSearchParams();
   const editId = search.get("edit"); // se presente, estamos REAGENDANDO
@@ -518,12 +536,12 @@ export default function Step2Schedule({
       
       if (!token) {
         // visitante: salva tentativa e manda pro login
-        const next = `/${tenantId}/novo-agendamento/sucesso`; // pós-login vamos finalizar e cair aqui
+        const next = `/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`; // pós-login vamos finalizar e cair aqui
         const params = new URLSearchParams({ next, pending: "1" });
         const { savePending } = await import("../../../lib/pendingBooking");
         savePending({ tenantId: String(tenantId), payload, isEditing, editId });
         sessionStorage.setItem("loginMessage", "Entre para finalizar seu agendamento.");
-        router.push(`/${tenantId}/login?${params.toString()}`);
+        router.push(`/${localStorage.getItem("tenantSlug")}/login?${params.toString()}`);
         return;
       }
 
@@ -551,13 +569,13 @@ export default function Step2Schedule({
             total: selectedSummary.priceTxt,
           })
         );
-        router.push(`/${tenantId}/novo-agendamento/sucesso?edit=1`);
+        router.push(`/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso?edit=1`);
       } else {
         sessionStorage.setItem("lastCreatedAppointment", JSON.stringify({
           id: data.id, date: selectedDate, time: pickedTime,
           total: selectedSummary.priceTxt, procs: selectedProcedures.map((p) => p.name),
         }));
-        router.push(`/${tenantId}/novo-agendamento/sucesso`);
+        router.push(`/${localStorage.getItem("tenantSlug")}/novo-agendamento/sucesso`);
       }
     } catch (e: any) {
       setSaveError(e.message || (isEditing ? "Erro ao salvar alterações." : "Erro ao salvar agendamento."));
@@ -941,7 +959,7 @@ export default function Step2Schedule({
                 Continuar
               </button>
               <button
-                onClick={() => router.push(`/${tenantId}/home`)}
+                onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/home`)}
                 className="flex-1 rounded-lg border py-2 bg-white hover:bg-gray-50 font-medium"
                 style={{ borderColor: "#fde2e2", color: "#b91c1c" }}
               >

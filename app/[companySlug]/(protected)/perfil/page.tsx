@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ensureTenantLoaded } from "../../../lib/tenant";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:10000";
 
@@ -45,7 +46,29 @@ function only5Digits(v: string) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { tenantId } = useParams<{ tenantId: string }>();
+
+  const [tenantId, setTenantId] = useState<string>(
+    typeof window !== "undefined" ? localStorage.getItem("tenantId") || "" : ""
+  );
+
+  useEffect(() => {
+    (async () => {
+      if (!tenantId) {
+        const t = await ensureTenantLoaded();
+        if (t?.tenantId) {
+          setTenantId(t.tenantId);
+          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
+        } else {
+          console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
+        }
+      }
+    })();
+  }, [tenantId]);
+
+  useEffect(() => {
+    const id = localStorage.getItem("tenantId");
+    if (id) setTenantId(id);
+  }, []);
 
   const [me, setMe] = useState<Me | null>(null);
 
@@ -90,7 +113,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const token = localStorage.getItem("clientPortalToken");
     if (!token) {
-      router.replace(`/${tenantId}/login`);
+      router.replace(`/${localStorage.getItem("tenantSlug")}/login`);
       return;
     }
     (async () => {
@@ -99,7 +122,7 @@ export default function ProfilePage() {
         const r = await fetch(`${API}/api/client-portal/me`, {
           headers: {
             "Content-Type": "application/json",
-            "x-tenant-id": String(tenantId || ""),
+            "x-tenant-id": tenantId,
             Authorization: `Bearer ${token}`,
           },
         });
@@ -188,7 +211,7 @@ export default function ProfilePage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
@@ -200,7 +223,7 @@ export default function ProfilePage() {
         setMsg("Perfil atualizado. Enviamos um código para o novo e-mail.");
       } else {
         setMsg("Perfil atualizado com sucesso.");
-        setTimeout(() => router.push(`/${tenantId}/home`), 700);
+        setTimeout(() => router.push(`/${localStorage.getItem("tenantSlug")}/home`), 700);
       }
     } catch (err: any) {
       setError(err.message || "Erro ao atualizar perfil.");
@@ -223,7 +246,7 @@ export default function ProfilePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify({ email }),
       });
@@ -255,7 +278,7 @@ export default function ProfilePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify({ email, code: verifyCode }),
       });
@@ -266,7 +289,7 @@ export default function ProfilePage() {
         localStorage.setItem("clientPortalToken", data.token);
         localStorage.setItem("clientPortalTenant", String(tenantId));
       }
-      router.push(`/${tenantId}/home`);
+      router.push(`/${localStorage.getItem("tenantSlug")}/home`);
     } catch (err: any) {
       setVerifyError(err?.message || "Falha ao verificar e-mail.");
     }
@@ -321,7 +344,7 @@ export default function ProfilePage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": String(tenantId || ""),
+          "x-tenant-id": tenantId,
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
@@ -352,7 +375,7 @@ export default function ProfilePage() {
         <div className="mx-auto max-w-3xl px-3 sm:px-4 py-3 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => router.push(`/${tenantId}/home`)}
+            onClick={() => router.push(`/${localStorage.getItem("tenantSlug")}/home`)}
             className="text-sm hover:underline"
             style={{ color: "#9d8983" }}
           >
