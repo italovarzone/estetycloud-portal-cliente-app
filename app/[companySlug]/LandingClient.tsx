@@ -66,15 +66,59 @@ export default function LandingClient({
             <img src="/assets/images/logo_fundo_transp.png" alt="" className="h-9 w-9 animate-fadeIn" />
             <span className="text-xl font-semibold tracking-wide">{data?.branding?.name || "Estety Cloud"}</span>
           </div>
-          <Link
-            href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
-            className="px-5 py-2 rounded-xl border-2 text-sm font-medium hover:scale-105 transition-transform"
-            style={{ borderColor: brandColor, color: brandColor }}
-          >
-            Agende Agora
-          </Link>
+
+          <div className="flex items-center gap-4">
+            {/* Ícone de pessoa com link "Já é um cliente?" */}
+            <Link
+              href={`/${localStorage.getItem("tenantSlug")}/home`}
+              className="flex flex-col items-center text-xs font-medium hover:opacity-80 transition"
+              style={{ color: brandColor }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                className="w-5 h-5 mb-[2px]"
+              >
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+              </svg>
+              Já é um cliente?
+            </Link>
+          </div>
         </div>
       </nav>
+
+{/* BOTÃO FIXO DE AGENDAMENTO (FLUTUANTE NO BOTTOM) */}
+<Link
+  href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+  className="fixed bottom-5 right-5 z-50 px-6 py-3 rounded-full text-sm font-semibold text-white shadow-lg hover:scale-105 transition-transform pulse"
+  style={{
+    backgroundColor: brandColor,
+    fontSize: "18px",
+    marginBottom: "10px",
+  }}
+>
+  Agende Agora
+</Link>
+
+<style jsx global>{`
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
+    }
+  }
+  .pulse {
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+`}</style>
 
       {/* HERO
       <header className="relative overflow-hidden">
@@ -107,7 +151,7 @@ export default function LandingClient({
 
       {/* SERVIÇOS */}
       {!!data?.services?.length && (
-        <section className="max-w-7xl mx-auto px-4 py-12">
+        <section className="max-w-7xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 animate-fadeIn">
             Confira todos os nossos serviços
           </h2>
