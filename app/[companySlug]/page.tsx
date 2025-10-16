@@ -44,8 +44,6 @@ export default async function TenantLanding({
   const cmsRes = await fetch(`${base}/api/cms/${company.tenantId}`, { cache: "no-store" });
 
   if (!cmsRes.ok) {
-    console.log(cmsRes);
-    console.log(company);
     console.warn("⚠️ CMS não encontrado para", company.tenantId);
     return (
       <main className="p-12 text-center text-gray-500">

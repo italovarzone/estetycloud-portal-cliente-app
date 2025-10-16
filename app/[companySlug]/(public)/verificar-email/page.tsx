@@ -24,7 +24,6 @@ export default function VerifyEmailPage() {
         const t = await ensureTenantLoaded();
         if (t?.tenantId) {
           setTenantId(t.tenantId);
-          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
         } else {
           console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
         }

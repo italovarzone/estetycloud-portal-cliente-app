@@ -17,6 +17,19 @@ type Me = {
   picture?: string | null;
 };
 
+function parseYmdUTC(ymd: string) {
+  // ymd: 'YYYY-MM-DD' → timestamp UTC no início do dia
+  const [y, m, d] = ymd.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function todayUTC() {
+  const now = new Date();
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+}
+function diffDaysUTC(aUTC: number, bUTC: number) {
+  // dias inteiros entre a e b
+  return Math.floor((aUTC - bUTC) / 86400000);
+}
 
 function initialsFromName(name?: string) {
   const parts = String(name || "").trim().split(/\s+/).slice(0, 2);
@@ -66,7 +79,6 @@ export default function HomePage() {
         const t = await ensureTenantLoaded();
         if (t?.tenantId) {
           setTenantId(t.tenantId);
-          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
         } else {
           console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
         }
@@ -100,7 +112,6 @@ useEffect(() => {
   (async () => {
     try {
       setLoading(true);
-      console.log("🔹 Buscando /me com tenant:", id);
       const r = await fetch(`${API}/api/client-portal/me`, {
         headers: {
           "Content-Type": "application/json",
@@ -168,6 +179,51 @@ useEffect(() => {
       document.removeEventListener("keydown", onEsc);
     };
   }, []);
+
+  const [nextAppointment, setNextAppointment] = useState<any>(null);
+
+useEffect(() => {
+  const token = localStorage.getItem("clientPortalToken");
+  const id = tenantId || localStorage.getItem("tenantId");
+  if (!token || !id) return;
+
+  (async () => {
+    try {
+      const r = await fetch(`${API}/api/client-portal/appointments/history`, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": id,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Erro ao carregar agendamentos.");
+
+      // 🔧 data base (UTC de hoje)
+      const baseTodayUTC = todayUTC();
+
+      // 🔎 encontra o próximo agendamento ativo (>= hoje)
+      const upcoming = data.history
+        .filter((a: any) => {
+          if (a.cancelado || a.concluida) return false;
+          const apptUTC = parseYmdUTC(a.date);
+          return apptUTC >= baseTodayUTC;
+        })
+        .sort((a: any, b: any) => parseYmdUTC(a.date) - parseYmdUTC(b.date))[0];
+
+      if (upcoming) {
+        const apptUTC = parseYmdUTC(upcoming.date);
+        const diffDays = diffDaysUTC(apptUTC, baseTodayUTC); // 0 = hoje
+        setNextAppointment({ ...upcoming, diffDays });
+      } else {
+        setNextAppointment(null);
+      }
+
+    } catch (err) {
+      console.error("Erro ao buscar próximos agendamentos:", err);
+    }
+  })();
+}, [tenantId]);
 
   const firstName = me?.name?.split(" ")[0] || "Cliente";
   const initials = initialsFromName(me?.name);
@@ -376,6 +432,40 @@ useEffect(() => {
                 </div>
               </div>
             )}
+
+                {nextAppointment && (
+                    <div
+                      className="mb-6 rounded-xl border px-4 py-4 bg-[#fff8f7] shadow-sm"
+                      style={{ borderColor: "#bca49d", color: "#1D1411" }}
+                    >
+                      {nextAppointment.diffDays === 0 ? (
+                        <p className="font-semibold">🎉 É hoje!</p>
+                      ) : nextAppointment.diffDays <= 3 ? (
+                        <p className="font-semibold">📅 Seu agendamento está chegando!</p>
+                      ) : nextAppointment.diffDays <= 7 ? (
+                        <p className="font-semibold">📆 Essa semana você tem um agendamento!</p>
+                      ) : null}
+
+                      <p className="text-sm mt-1">
+                        {nextAppointment.procedures?.map((p: any) => p.name).join(", ")} —{" "}
+                        {(() => {
+                          const [y, m, d] = nextAppointment.date.split("-");
+                          return `${d}/${m}/${y}`;
+                        })()} às{" "}
+                        {nextAppointment.time}
+                      </p>
+
+                      <div className="w-full mt-3 flex gap-3">
+                        <button
+                          onClick={() => go("/meus-agendamentos")}
+                          className="w-full rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50 transition"
+                          style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                        >
+                          Ver agendamento
+                        </button>
+                      </div>
+                    </div>
+                  )}
           </section>
         )}
 

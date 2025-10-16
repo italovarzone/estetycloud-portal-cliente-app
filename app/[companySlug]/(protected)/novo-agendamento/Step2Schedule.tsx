@@ -116,7 +116,6 @@ export default function Step2Schedule({
         const t = await ensureTenantLoaded();
         if (t?.tenantId) {
           setTenantId(t.tenantId);
-          console.log("✅ Tenant carregado via ensureTenantLoaded:", t.tenantId);
         } else {
           console.warn("⚠️ Nenhum tenant encontrado para esta rota.");
         }
@@ -186,7 +185,7 @@ export default function Step2Schedule({
   );
 
   const isIdle = useScrollIdle(1000);
-  const showBar = pickedTime && isIdle; // só mostra se tiver horário escolhido e scroll parado
+  const showBar = isIdle; // só mostra se tiver horário escolhido e scroll parado
 
   const [allowedWeek, setAllowedWeek] =
     useState<{ start: string; end: string } | null>(null);
@@ -721,7 +720,7 @@ export default function Step2Schedule({
             })()}
           </b>
           , conforme a política de retorno de{" "}
-          <b>{restrictionInfo?.days}</b> dias.
+          <b>{restrictionInfo?.days}</b> dias. Em caso de dúvidas, entre em contato com a profissional.
         </div>
       )}
 

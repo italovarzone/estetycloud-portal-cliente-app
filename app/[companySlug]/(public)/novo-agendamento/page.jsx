@@ -29,7 +29,6 @@ export default function NovoAgendamentoPage() {
             setWhen({ date, time });
             // aqui você já pode ir para o Step3 (confirmação)
             // setStep(3);
-            console.log("Escolhido:", date, time);
           }}
         />
       )}

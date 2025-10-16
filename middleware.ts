@@ -24,7 +24,6 @@ export function middleware(req: NextRequest) {
 
   if (slug && slug !== existing) {
     res.cookies.set("tenantSlug", slug, { path: "/", maxAge: 86400 });
-    console.log("🌐 Middleware definiu tenantSlug =", slug);
   }
 
   return res;

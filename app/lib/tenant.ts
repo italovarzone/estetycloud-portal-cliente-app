@@ -37,7 +37,6 @@ export async function ensureTenantLoaded() {
       localStorage.setItem("tenantId", company.tenantId);
       localStorage.setItem("tenantSlug", slug);
       document.cookie = `tenantid=${company.tenantId}; path=/; max-age=86400`;
-      console.log("✅ Tenant restaurado via slug:", slug, company.tenantId);
       return { tenantId: company.tenantId, slug };
     }
 

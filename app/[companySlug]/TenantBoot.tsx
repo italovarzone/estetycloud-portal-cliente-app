@@ -11,7 +11,6 @@ export default function TenantBoot({
 }) {
   useEffect(() => {
     if (!tenantId) return;
-    console.log("🌐 Registrando tenant:", tenantId, companySlug);
     localStorage.setItem("tenantId", tenantId);
     localStorage.setItem("tenantSlug", companySlug);
     document.cookie = `tenantid=${tenantId}; path=/; max-age=86400`;

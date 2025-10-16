@@ -80,9 +80,7 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
   // tenta buscar o landing.json nas bases
   for (const b of attempts) {
     debugger;
-    console.log("[CMS] Tentando URL:", b.cfg);
     const res = await fetch(b.cfg, { cache: "no-store" });
-    console.log("[CMS] Status:", res.status);
     if (!res.ok) continue;
     cfg = await b.parse(res);
     assetBase = b.asset;
