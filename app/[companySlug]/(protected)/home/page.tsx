@@ -429,6 +429,14 @@ useEffect(() => {
                   >
                     Meus agendamentos
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => go("/meus-pacotes")}
+                    className="w-full rounded-xl border py-2.5 font-medium bg-white hover:bg-gray-50 transition"
+                    style={{ borderColor: "#bca49d", color: "#9d8983" }}
+                  >
+                    Meus pacotes
+                  </button>
                 </div>
               </div>
             )}

@@ -64,6 +64,12 @@ export default function Step1Procedures({
 
   const search = useSearchParams();
   const editId = search.get("edit");
+  const fromPackage = search.get("fromPackage");
+  const preProcId = search.get("procId");
+  const preProcName = search.get("procName");
+  const prePkgPriceRaw = search.get("pkgPrice");
+  const preSubId = search.get("subId");
+  const prePkgLabel = search.get("pkgLabel");
 
   const [procedures, setProcedures] = useState<Proc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +101,13 @@ export default function Step1Procedures({
   useEffect(() => {
     setSelectedIds(new Set(cart.map((c: any) => String(c._id))));
   }, [cart]);
+
+  // preços forçados (desconto do pacote ou reagendamento mantendo valor)
+  const [forcedPrices, setForcedPrices] = useState<Map<string, number>>(new Map());
+  const prePkgPrice = useMemo(() => {
+    const n = Number(prePkgPriceRaw || "");
+    return Number.isFinite(n) ? n : undefined;
+  }, [prePkgPriceRaw]);
 
   useEffect(() => {
     async function load() {
@@ -152,6 +165,20 @@ export default function Step1Procedures({
             setLastHasRestrictions(false);
             setCompletedIds(new Set());
           }
+
+        // 4) Pré-seleção vinda do pacote (se não estiver editando)
+        if (!editId && (fromPackage === "1" || fromPackage === "true")) {
+          // tenta resolver ID do procedimento
+          const byId = list.find((p) => String(p._id) === String(preProcId || ""));
+          const byName = list.find((p) => String(p.name || "").toLowerCase() === String(decodeURIComponent(preProcName || "")).toLowerCase());
+          const chosen = byId || byName;
+          if (chosen) {
+            setSelectedIds(new Set([String(chosen._id)]));
+            if (prePkgPrice != null) {
+              setForcedPrices(new Map([[String(chosen._id), Number(prePkgPrice)]]));
+            }
+          }
+        }
       } catch (err) {
         console.error("Erro ao carregar procedimentos:", err);
       } finally {
@@ -166,11 +193,16 @@ export default function Step1Procedures({
     if (!editId || !editingAppt || !procedures.length) return;
     const byName = new Map<string, string>(procedures.map((p) => [String(p.name || "").toLowerCase(), String(p._id)]));
     const ids = new Set<string>();
+    const fp = new Map<string, number>();
     for (const p of editingAppt.procedures || []) {
-      const raw = p?.procedureId || p?._id || byName.get(String(p?.name || "").toLowerCase());
-      if (raw) ids.add(String(raw));
+      const rawId = p?.procedureId || p?._id || byName.get(String(p?.name || "").toLowerCase());
+      if (rawId) {
+        ids.add(String(rawId));
+        if (p?.price != null) fp.set(String(rawId), Number(p.price)); // mantém valor anterior (pode ser desconto do pacote)
+      }
     }
     if (ids.size) setSelectedIds(ids);
+    if (fp.size) setForcedPrices(fp);
   }, [editId, editingAppt, procedures]);
 
   // apenas ativos
@@ -291,9 +323,12 @@ export default function Step1Procedures({
 
   const totals = useMemo(() => {
     const totalMinutes = selectedList.reduce((acc, p) => acc + Number(p.duration || 0), 0);
-    const totalPrice = selectedList.reduce((acc, p) => acc + Number(p.price || 0), 0);
+    const totalPrice = selectedList.reduce((acc, p) => {
+      const forced = forcedPrices.get(String(p._id));
+      return acc + Number(forced != null ? forced : p.price || 0);
+    }, 0);
     return { totalMinutes, totalPrice };
-  }, [selectedList]);
+  }, [selectedList, forcedPrices]);
 
   const goStep = (n: number) => {
     if (n === 2 && selectedList.length) onNext(selectedList);
@@ -327,6 +362,8 @@ export default function Step1Procedures({
   const renderItem = (p: Proc) => {
     const id = String(p._id);
     const selected = selectedIds.has(id);
+  const forcedPrice = forcedPrices.get(id);
+  const hasDiscount = forcedPrice != null && forcedPrice !== p.price;
 
     // verifica se há algum restrito selecionado
     const hasRestrictedSelected = Array.from(selectedIds).some((sid) => {
@@ -375,8 +412,18 @@ export default function Step1Procedures({
             {p.description ? (
               <div className="text-xs text-gray-600 mt-0.5 line-clamp-2">{p.description}</div>
             ) : null}
-            <div className="text-sm text-gray-500 mt-1">
-              {formatDuration(p.duration)} • {brl.format(Number(p.price || 0))}
+            <div className="text-sm text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
+              <span>{formatDuration(p.duration)}</span>
+              <span>•</span>
+              {hasDiscount ? (
+                <>
+                  <span className="line-through opacity-70">{brl.format(Number(p.price || 0))}</span>
+                  <span className="font-medium" style={{ color: "#9d8983" }}>{brl.format(Number(forcedPrice))}</span>
+                  <span className="text-[11px] rounded px-1.5 py-0.5 border" style={{ borderColor: "#e6cfc9", background: "#fff8f6", color: "#9d8983" }}>Preço do pacote</span>
+                </>
+              ) : (
+                <span>{brl.format(Number(p.price || 0))}</span>
+              )}
             </div>
           </div>
           {selected && (
@@ -490,7 +537,14 @@ export default function Step1Procedures({
             <button
               type="button"
               disabled={!selectedList.length}
-              onClick={() => onNext(selectedList)}
+              onClick={() => {
+                // aplica preços forçados (pacote ou edição) antes de avançar
+                const adjusted = selectedList.map((p) => ({
+                  ...p,
+                  price: forcedPrices.get(String(p._id)) ?? p.price,
+                }));
+                onNext(adjusted);
+              }}
               className={`flex-1 rounded-xl border py-3 font-medium shadow-soft ${
                 selectedList.length ? "bg-white hover:bg-gray-50" : "bg-gray-100 text-gray-400"
               }`}
@@ -504,6 +558,13 @@ export default function Step1Procedures({
           </div>
         </div>
       </div>
+
+      {/* Aviso: pagamento do pacote */}
+      {(fromPackage === "1" || fromPackage === "true") && (
+        <div className="mt-4 rounded-lg border p-3 text-xs" style={{ borderColor: "#e6cfc9", background: "#fff8f6", color: "#9d8983" }}>
+          O pagamento do pacote será realizado até um dia antes do vencimento do ciclo.
+        </div>
+      )}
 
       {/* Dialog de desistência */}
       {abortOpen && (
