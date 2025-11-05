@@ -61,18 +61,88 @@ export default function LandingClient({
             : "bg-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between transition-all">
-          <div className="flex items-center gap-3">
-            <img src="/assets/images/logo_fundo_transp.png" alt="" className="h-9 w-9 animate-fadeIn" />
-            <span className="text-xl font-semibold tracking-wide">{data?.branding?.name || "Estety Cloud"}</span>
+        <div className="max-w-7xl mx-auto px-4 py-3 transition-all">
+          {/* Top row: brand + desktop actions */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <img src="/assets/images/logo_fundo_transp.png" alt="Logo Estety Cloud" className="h-9 w-9 animate-fadeIn" />
+              <span className="text-xl font-semibold tracking-wide max-w-[50vw] truncate">{data?.branding?.name || "Estety Cloud"}</span>
+            </div>
+
+            {/* Desktop actions */}
+            <div className="hidden sm:flex items-center gap-3 md:gap-4 flex-shrink-0">
+              {/* Já é um cliente? */}
+              <Link
+                href={`/${localStorage.getItem("tenantSlug")}/home`}
+                className="flex items-center gap-2 text-xs font-medium hover:opacity-90 transition px-2 py-2 rounded-md hover:bg-gray-50"
+                style={{ color: brandColor }}
+                aria-label="Já é um cliente? Entrar"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  className="w-5 h-5"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+                </svg>
+                <span>Já é um cliente?</span>
+              </Link>
+
+              {/* CTA: Novo agendamento */}
+              <Link
+                href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+                className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-semibold px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 focus-visible:ring-offset-2"
+                style={{ backgroundColor: brandColor, color: "#ffffff" }}
+                aria-label="Novo agendamento"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  className="w-4 h-4"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                  <path d="M12 14v4M10 16h4" />
+                </svg>
+                <span>Novo agendamento</span>
+              </Link>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Ícone de pessoa com link "Já é um cliente?" */}
+          {/* Mobile actions: full-width buttons */}
+          <div className="sm:hidden mt-3 grid grid-cols-2 gap-2">
+            <Link
+              href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+              className="inline-flex items-center justify-center gap-2 h-10 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: brandColor, color: "#ffffff" }}
+              aria-label="Novo agendamento"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="w-4 h-4"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+                <path d="M12 14v4M10 16h4" />
+              </svg>
+              <span>Novo Agendamento</span>
+            </Link>
             <Link
               href={`/${localStorage.getItem("tenantSlug")}/home`}
-              className="flex flex-col items-center text-xs font-medium hover:opacity-80 transition"
-              style={{ color: brandColor }}
+              className="inline-flex items-center justify-center gap-2 h-10 rounded-xl font-medium text-sm border"
+              style={{ borderColor: brandColor, color: brandColor, backgroundColor: "#ffffff" }}
+              aria-label="Já é um cliente? Entrar"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -80,12 +150,12 @@ export default function LandingClient({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={1.8}
-                className="w-5 h-5 mb-[2px]"
+                className="w-4 h-4"
               >
                 <circle cx="12" cy="8" r="4" />
                 <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
               </svg>
-              Já é um cliente?
+              <span>Sou cliente</span>
             </Link>
           </div>
         </div>
