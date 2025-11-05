@@ -148,12 +148,30 @@ export default function LoginPage() {
   // util: resolve next da URL
   function resolveNext(): string {
     const params = new URLSearchParams(window.location.search);
+    const slug = localStorage.getItem("tenantSlug") || "";
+
+    // valor inicial do next
     let next = params.get("next") || "/home";
-    // normaliza para a raiz do tenant
-    if (tenantId && next.startsWith(`/${tenantId}`)) {
-      next = next.slice(tenantId.length + 1) || "/home";
-    }
-    return `/${localStorage.getItem("tenantSlug")}${next}`;
+
+    // garante que começa com /
+    if (!next.startsWith("/")) next = `/${next}`;
+
+    // remove prefixos duplicados (slug ou tenantId) se já vierem na URL
+    const stripPrefix = (path: string, prefix?: string | null) => {
+      if (!prefix) return path;
+      const p = `/${prefix}`;
+      return path.startsWith(p) ? path.slice(p.length) || "/" : path;
+    };
+
+    // strip em ordem: slug (ex.: /livia-moraes/...), depois tenantId se aplicável
+    next = stripPrefix(next, slug);
+    next = stripPrefix(next, tenantId);
+
+    // fallback razoável
+    if (next === "/") next = "/home";
+
+    // monta caminho final com um único slug na frente
+    return `/${slug}${next}`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
