@@ -111,7 +111,12 @@ export default function LandingClient({
                   <path d="M16 2v4M8 2v4M3 10h18" />
                   <path d="M12 14v4M10 16h4" />
                 </svg>
-                <span>Novo agendamento</span>
+                <div className="flex flex-col items-start leading-tight">
+                  <span>Novo Cliente</span>
+                  <small style={{ fontSize: "10px", display: "block", marginTop: "2px" }}>
+                    Agende agora mesmo!
+                  </small>
+              </div>
               </Link>
             </div>
           </div>
@@ -136,7 +141,12 @@ export default function LandingClient({
                 <path d="M16 2v4M8 2v4M3 10h18" />
                 <path d="M12 14v4M10 16h4" />
               </svg>
-              <span>Novo Agendamento</span>
+              <div className="flex flex-col items-start leading-tight">
+                <span>Novo Cliente</span>
+                <small style={{ fontSize: "10px", display: "block", marginTop: "2px" }}>
+                  Agende agora mesmo!
+                </small>
+              </div>
             </Link>
             <Link
               href={`/${localStorage.getItem("tenantSlug")}/home`}
@@ -155,7 +165,7 @@ export default function LandingClient({
                 <circle cx="12" cy="8" r="4" />
                 <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
               </svg>
-              <span>Sou cliente</span>
+              <span>Já sou cliente</span>
             </Link>
           </div>
         </div>
