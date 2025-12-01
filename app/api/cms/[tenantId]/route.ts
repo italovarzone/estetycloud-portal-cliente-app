@@ -4,9 +4,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
-const OWNER = process.env.CMS_GH_OWNER!;
-const REPO  = process.env.CMS_GH_REPO!;
-const REF   = process.env.CMS_GH_REF || "main";
+// GitHub repo info with safe defaults (avoid undefined in prod)
+const OWNER = process.env.CMS_GH_OWNER || "italovarzone";
+const REPO  = process.env.CMS_GH_REPO  || "repository-ecimages";
+const REF   = process.env.CMS_GH_REF   || "main";
 // Config Service
 const CONFIG_SERVICE_BASE = process.env.CONFIG_SERVICE_BASE || "";
 const CONFIG_API_KEY = process.env.CONFIG_API_KEY || "";
@@ -81,7 +82,8 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
     console.warn("[CMS] Falha ao resolver folder via config service:", (e as Error)?.message);
   }
 
-  const commitSha = REF;
+  // Use latest commit SHA to avoid stale CDN content
+  const commitSha = await resolveCommitSha();
   const attempts = makeBases(folder, commitSha);
 
   let cfg: any | null = null;
@@ -166,5 +168,5 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
     contact: cfg?.contact ?? {},
     testimonials: cfg?.testimonials ?? [],
     faq: cfg?.faq ?? [],
-  });
+  }, { headers: { 'cache-control': 'no-store' } });
 }
