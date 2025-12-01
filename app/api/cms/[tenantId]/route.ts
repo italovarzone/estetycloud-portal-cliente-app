@@ -16,6 +16,7 @@ const TENANT_FOLDER_MAP: Record<string, string> = {
   "187a677b-7d9f-490a-8622-aa131966697c": "livia-moraes",
   "3b5bfc29-2400-41d9-8546-cdc7c4d7f353": "esl",
   "53a60676-fe12-42ba-88c3-0c1ac9fa1189": "tckc",
+  "abc4d134-1f16-43a7-8796-6592bf0f4449": "clinica-teste"
 };
 
 /**
