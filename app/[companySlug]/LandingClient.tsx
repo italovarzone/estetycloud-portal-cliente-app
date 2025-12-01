@@ -49,9 +49,7 @@ export default function LandingClient({
     el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
-  if (!data?.hero?.title && !data?.services?.length && !data?.gallery?.length) {
-    return <div className="p-6">Conteúdo não carregado (ver console)</div>;
-  }
+  // Renderiza mesmo sem conteúdo inicial para evitar bloqueio da página
 
   return (
     <>

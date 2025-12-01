@@ -63,6 +63,7 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
 
   // 🔍 resolve pasta (slug) via Config Service
   let folder = tenantId;
+  let resolved: any = null;
   try {
     if (!CONFIG_SERVICE_BASE) throw new Error("CONFIG_SERVICE_BASE ausente");
     const url = `${CONFIG_SERVICE_BASE.replace(/\/$/, "")}/api/tenants/resolve?tenant=${encodeURIComponent(tenantId)}`;
@@ -73,8 +74,8 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
       cache: "no-store",
     });
     if (res.ok) {
-      const data: any = await res.json();
-      folder = data?.company?.slug || data?.slug || tenantId;
+      resolved = await res.json();
+      folder = resolved?.company?.slug || resolved?.slug || tenantId;
     }
   } catch (e) {
     console.warn("[CMS] Falha ao resolver folder via config service:", (e as Error)?.message);
@@ -96,10 +97,41 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
   }
 
   if (!cfg || !assetBase) {
-    return NextResponse.json(
-      { ok: false, error: `landing.json não encontrado para tenantId ${tenantId} (pasta: ${folder})` },
-      { status: 404 }
-    );
+    // Fallback seguro: retorna um template padrão para evitar 404
+    const companyName = resolved?.company?.name || resolved?.name || "Estúdio";
+    const fallback = {
+      branding: { name: companyName, primaryColor: "#bca49d" },
+      hero: { title: "", subtitle: "", cover: undefined as string | undefined },
+      services: [] as any[],
+      gallery: [] as any[],
+      about: { title: "", text: "", photo1: undefined as string | undefined, photo2: undefined as string | undefined },
+      contact: {},
+      testimonials: [],
+      faq: [],
+    };
+
+    return NextResponse.json({
+      ok: true,
+      tenantId,
+      folder,
+      branding: fallback.branding,
+      hero: {
+        title: fallback.hero.title,
+        subtitle: fallback.hero.subtitle,
+        cover: undefined,
+      },
+      services: [],
+      gallery: [],
+      about: {
+        title: fallback.about.title,
+        text: fallback.about.text,
+        photo1: undefined,
+        photo2: undefined,
+      },
+      contact: fallback.contact,
+      testimonials: fallback.testimonials,
+      faq: fallback.faq,
+    });
   }
 
   const abs = (name?: string) =>
