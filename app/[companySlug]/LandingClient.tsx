@@ -16,9 +16,11 @@ type Cms = {
 
 export default function LandingClient({
   tenantId,
+  companySlug,
   data,
 }: {
   tenantId: string;
+  companySlug: string;
   data: Cms;
 }) {
   const brandColor = data?.branding?.primaryColor || "#bca49d";
@@ -73,7 +75,7 @@ export default function LandingClient({
             <div className="hidden sm:flex items-center gap-3 md:gap-4 flex-shrink-0">
               {/* Já é um cliente? */}
               <Link
-                href={`/${localStorage.getItem("tenantSlug")}/home`}
+                href={`/${companySlug}/home`}
                 className="flex items-center gap-2 text-xs font-medium hover:opacity-90 transition px-2 py-2 rounded-md hover:bg-gray-50"
                 style={{ color: brandColor }}
                 aria-label="Já é um cliente? Entrar"
@@ -94,7 +96,7 @@ export default function LandingClient({
 
               {/* CTA: Novo agendamento */}
               <Link
-                href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+                href={`/${companySlug}/novo-agendamento`}
                 className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-semibold px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 focus-visible:ring-offset-2"
                 style={{ backgroundColor: brandColor, color: "#ffffff" }}
                 aria-label="Novo agendamento"
@@ -124,7 +126,7 @@ export default function LandingClient({
           {/* Mobile actions: full-width buttons */}
           <div className="sm:hidden mt-3 grid grid-cols-2 gap-2">
             <Link
-              href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+              href={`/${companySlug}/novo-agendamento`}
               className="inline-flex items-center justify-center gap-2 h-10 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
               style={{ backgroundColor: brandColor, color: "#ffffff" }}
               aria-label="Novo agendamento"
@@ -149,7 +151,7 @@ export default function LandingClient({
               </div>
             </Link>
             <Link
-              href={`/${localStorage.getItem("tenantSlug")}/home`}
+              href={`/${companySlug}/home`}
               className="inline-flex items-center justify-center gap-2 h-10 rounded-xl font-medium text-sm border"
               style={{ borderColor: brandColor, color: brandColor, backgroundColor: "#ffffff" }}
               aria-label="Já é um cliente? Entrar"
@@ -173,7 +175,7 @@ export default function LandingClient({
 
 {/* BOTÃO FIXO DE AGENDAMENTO (FLUTUANTE NO BOTTOM) */}
 <Link
-  href={`/${localStorage.getItem("tenantSlug")}/novo-agendamento`}
+  href={`/${companySlug}/novo-agendamento`}
   className="fixed bottom-5 right-5 z-50 px-6 py-3 rounded-full text-sm font-semibold text-white shadow-lg hover:scale-105 transition-transform pulse"
   style={{
     backgroundColor: brandColor,

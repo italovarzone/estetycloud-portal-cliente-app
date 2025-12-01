@@ -7,17 +7,9 @@ export const revalidate = 60;
 const OWNER = process.env.CMS_GH_OWNER!;
 const REPO  = process.env.CMS_GH_REPO!;
 const REF   = process.env.CMS_GH_REF || "main";
-
-/**
- * Mapa de tenantId → nome da pasta do CMS (slug)
- */
-const TENANT_FOLDER_MAP: Record<string, string> = {
-  "05616ffe-33bc-4f88-b6f5-b43ab3a0a759": "ipv-desenv",
-  "187a677b-7d9f-490a-8622-aa131966697c": "livia-moraes",
-  "3b5bfc29-2400-41d9-8546-cdc7c4d7f353": "esl",
-  "53a60676-fe12-42ba-88c3-0c1ac9fa1189": "tckc",
-  "abc4d134-1f16-43a7-8796-6592bf0f4449": "clinica-teste"
-};
+// Config Service
+const CONFIG_SERVICE_BASE = process.env.CONFIG_SERVICE_BASE || "";
+const CONFIG_API_KEY = process.env.CONFIG_API_KEY || "";
 
 /**
  * Resolve o commit hash da branch principal
@@ -69,10 +61,26 @@ function makeBases(folder: string, ref: string) {
 export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
   const { tenantId } = params;
 
-  // 🔍 traduz tenantId → nome da pasta
-  const folder = TENANT_FOLDER_MAP[tenantId] ?? tenantId;
+  // 🔍 resolve pasta (slug) via Config Service
+  let folder = tenantId;
+  try {
+    if (!CONFIG_SERVICE_BASE) throw new Error("CONFIG_SERVICE_BASE ausente");
+    const url = `${CONFIG_SERVICE_BASE.replace(/\/$/, "")}/api/tenants/resolve?tenant=${encodeURIComponent(tenantId)}`;
+    const res = await fetch(url, {
+      headers: CONFIG_API_KEY
+        ? { Authorization: `Bearer ${CONFIG_API_KEY}` }
+        : {},
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data: any = await res.json();
+      folder = data?.company?.slug || data?.slug || tenantId;
+    }
+  } catch (e) {
+    console.warn("[CMS] Falha ao resolver folder via config service:", (e as Error)?.message);
+  }
 
-  const commitSha = "main";
+  const commitSha = REF;
   const attempts = makeBases(folder, commitSha);
 
   let cfg: any | null = null;
@@ -80,7 +88,6 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
 
   // tenta buscar o landing.json nas bases
   for (const b of attempts) {
-    debugger;
     const res = await fetch(b.cfg, { cache: "no-store" });
     if (!res.ok) continue;
     cfg = await b.parse(res);

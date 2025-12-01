@@ -26,7 +26,6 @@ export default async function TenantLanding({
 }: {
   params: { companySlug: string };
 }) {
-  debugger;
   if (RESERVED.has(companySlug)) notFound();
 
   // chama o CONFIG SERVICE para resolver o tenantId
@@ -59,7 +58,7 @@ export default async function TenantLanding({
   return (
     <main className="bg-[#f8f9fa] text-[#1D1411]">
       <TenantBoot tenantId={company.tenantId} companySlug={company.slug} />
-      <LandingClient tenantId={company.tenantId} data={data} />
+      <LandingClient tenantId={company.tenantId} companySlug={company.slug} data={data} />
     </main>
   );
 }
