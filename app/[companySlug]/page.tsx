@@ -47,8 +47,8 @@ export default async function TenantLanding({
     console.warn("⚠️ CMS não encontrado para", company.tenantId);
     return (
       <main className="p-12 text-center text-gray-500">
-        <h1 className="text-2xl font-semibold mb-2">Empresa encontrada</h1>
-        <p>Mas ainda não há conteúdo configurado no CMS.</p>
+        <h1 className="text-2xl font-semibold mb-2">Empresa ativa</h1>
+        <p>Contate o administrador em estetycloud@gmail.com enviando uma solicitação para ativar no CMS e utilizar o portal do cliente.</p>
         <p className="mt-4 text-sm text-gray-400">tenantId: {company.tenantId}</p>
       </main>
     );
