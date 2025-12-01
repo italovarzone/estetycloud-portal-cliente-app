@@ -40,7 +40,7 @@ export default async function TenantLanding({
 
   // agora obtem o CMS com base no tenantId real
   const base = absoluteBaseUrl();
-  const cmsRes = await fetch(`${base}/api/cms/${company.tenantId}`, { cache: "no-store" });
+  const cmsRes = await fetch(`${base}/api/cms/${company.tenantId}?slug=${encodeURIComponent(company.slug)}` , { cache: "no-store" });
 
   if (!cmsRes.ok) {
     console.warn("⚠️ CMS não encontrado para", company.tenantId);

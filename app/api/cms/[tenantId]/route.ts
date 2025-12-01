@@ -61,25 +61,29 @@ function makeBases(folder: string, ref: string) {
 
 export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
   const { tenantId } = params;
+  const { searchParams } = new URL(req.url);
+  const slugFromQuery = (searchParams.get('slug') || '').trim();
 
-  // 🔍 resolve pasta (slug) via Config Service
-  let folder = tenantId;
+  // 🔍 resolve pasta (slug)
+  let folder = slugFromQuery || tenantId;
   let resolved: any = null;
-  try {
-    if (!CONFIG_SERVICE_BASE) throw new Error("CONFIG_SERVICE_BASE ausente");
-    const url = `${CONFIG_SERVICE_BASE.replace(/\/$/, "")}/api/tenants/resolve?tenant=${encodeURIComponent(tenantId)}`;
-    const res = await fetch(url, {
-      headers: CONFIG_API_KEY
-        ? { Authorization: `Bearer ${CONFIG_API_KEY}` }
-        : {},
-      cache: "no-store",
-    });
-    if (res.ok) {
-      resolved = await res.json();
-      folder = resolved?.company?.slug || resolved?.slug || tenantId;
+  if (!slugFromQuery) {
+    try {
+      if (!CONFIG_SERVICE_BASE) throw new Error("CONFIG_SERVICE_BASE ausente");
+      const url = `${CONFIG_SERVICE_BASE.replace(/\/$/, "")}/api/tenants/resolve?tenant=${encodeURIComponent(tenantId)}`;
+      const res = await fetch(url, {
+        headers: CONFIG_API_KEY
+          ? { Authorization: `Bearer ${CONFIG_API_KEY}` }
+          : {},
+        cache: "no-store",
+      });
+      if (res.ok) {
+        resolved = await res.json();
+        folder = resolved?.company?.slug || resolved?.slug || folder;
+      }
+    } catch (e) {
+      console.warn("[CMS] Falha ao resolver folder via config service:", (e as Error)?.message);
     }
-  } catch (e) {
-    console.warn("[CMS] Falha ao resolver folder via config service:", (e as Error)?.message);
   }
 
   // Use latest commit SHA to avoid stale CDN content
